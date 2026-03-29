@@ -1,0 +1,10 @@
+{
+  "timeZone": "Asia/Seoul",
+  "dependencies": {
+  },
+  "executionApi": {
+    "access": "MYSELF"
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8"
+}
