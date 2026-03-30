@@ -914,7 +914,7 @@ function saveResultsToSheet(data) {
   try {
     const today = new Date();
     const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyyMMdd");
-    const fileName = `journal_crawl_db_${formattedDate}`;
+    const fileName = `eos_immune_wg_${formattedDate}`;
 
     const spreadsheet = SpreadsheetApp.create(fileName);
     const sheet = spreadsheet.getActiveSheet();

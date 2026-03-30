@@ -347,7 +347,7 @@ function saveResultsToSheet(data) {
   try {
     const today = new Date();
     const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyyMMdd");
-    const fileName = `journal_crawl_db_${formattedDate}`;
+    const fileName = `respiratory_tue_${formattedDate}`;
     
     // 새로운 스프레드시트 생성 후 데이터 저장
     const spreadsheet = SpreadsheetApp.create(fileName);

@@ -1019,7 +1019,7 @@ function saveResultsToSheet(data) {
   try {
     const today = new Date();
     const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyyMMdd");
-    const fileName = `journal_cu_ana_db_${formattedDate}`;
+    const fileName = `cu_ana_wg_${formattedDate}`;
 
     const spreadsheet = SpreadsheetApp.create(fileName);
     const sheet = spreadsheet.getActiveSheet();
