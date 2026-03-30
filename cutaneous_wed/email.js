@@ -69,26 +69,39 @@ function sendSummariesToEmail(spreadsheet) {
     Logger.log(searchPeriod); 
 
 
+    // 요약이 있는 논문 수 사전 집계
+    const validCount = data.filter(row => {
+      const s = row[summaryColIndex] || "";
+      return s && !s.startsWith("초록이 없습니다") && !s.startsWith("오류:") && s !== "요약 정보 없음";
+    }).length;
+
     // 이메일 제목
-    const emailSubject = `[Ajou Allergy Journal Letter] Cutaneous diseases ${searchPeriod} - 총 ${lastRow - 1}개 논문`;
-    
+    const emailSubject = `[Ajou Allergy Journal Letter] Cutaneous diseases ${searchPeriod} - 총 ${validCount}개 논문`;
+
     // 이메일 본문 시작
     let emailBody = `<div style="font-family: Arial, sans-serif;">`;
     emailBody += `<h4>최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) Urticaria/Angioedema/Food/Drug/Atopic dermatitis 논문 요약 </h4>`;
-    emailBody += `<p>총 ${lastRow - 1}개의 논문 요약을 공유합니다.</p>`;
+    emailBody += `<p>총 ${lastRow - 1}개 검색 중 ${validCount}개의 논문 요약을 공유합니다.</p>`;
     //emailBody += `<p>스프레드시트 링크: <a href="${spreadsheet.getUrl()}">${spreadsheet.getName()}</a></p>`;
     emailBody += `<hr style="margin: 20px 0;">`;
     
-    // 각 논문 정보 추가
+    // 각 논문 정보 추가 (초록 없는 논문 및 요약 실패 건 제외)
+    let includedCount = 0;
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      
+
       const title = row[titleColIndex] || "제목 정보 없음";
       const journal = journalColIndex !== -1 ? row[journalColIndex] : "저널 정보 없음";
       const date = dateColIndex !== -1 ? row[dateColIndex] : "";
       const pmid = row[pmidColIndex] || "PMID 정보 없음";
       const pubType = pubTypeColIndex !== -1 ? row[pubTypeColIndex] : "출판 유형 정보 없음";
-      const summary = row[summaryColIndex] || "요약 정보 없음";
+      const summary = row[summaryColIndex] || "";
+
+      // 초록 없음/요약 실패 건 제외
+      if (!summary || summary.startsWith("초록이 없습니다") || summary.startsWith("오류:") || summary === "요약 정보 없음") {
+        continue;
+      }
+      includedCount++;
       
       // PubMed 링크 생성
       const pubmedLink = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
