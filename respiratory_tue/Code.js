@@ -128,7 +128,7 @@ function fetchPubMedWeeklyAndSave() {
   
   const startDate = formatDate(oneWeekAgo);
   const endDate = formatDate(today);
-  const dateRange = `"${startDate}"[PDAT] : "${endDate}"[PDAT]`;
+  const dateRange = `"${startDate}"[EDAT] : "${endDate}"[EDAT]`;
   
   // 3. 최종 쿼리 생성 및 URL 인코딩
   const finalQuery = `(${journalQuery}) AND ((${diseaseQuery}) OR (${meshQuery})) AND (${dateRange})`;

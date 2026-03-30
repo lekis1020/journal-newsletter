@@ -129,10 +129,12 @@ function fetchPubMedWeeklyAndSave() {
   
   const startDate = formatDate(oneWeekAgo);
   const endDate = formatDate(today);
-  const dateRange = `"${startDate}"[PDAT] : "${endDate}"[PDAT]`;
-  
+  const dateRange = `"${startDate}"[EDAT] : "${endDate}"[EDAT]`;
+
   // 3. 최종 쿼리 생성 및 URL 인코딩
-  const finalQuery = `((${meshQuery})) AND (${dateRange}) AND (${journalQuery})`;
+  // MeSH Terms OR 제목 키워드로 검색 (MeSH 인덱싱 지연 대응)
+  const keywordQuery = `(${meshQuery}) OR (${diseaseQuery})`;
+  const finalQuery = `(${journalQuery}) AND (${keywordQuery}) AND (${dateRange})`;
   const encodedQuery = encodeURIComponent(finalQuery);
   
   // 4. PubMed API 호출
@@ -189,13 +191,12 @@ function fetchPubMedWeeklyAndSave_POST() {
   
   const startDate = formatDate(oneWeekAgo);
   const endDate = formatDate(today);
-  const dateRange = `"${startDate}"[PDAT] : "${endDate}"[PDAT]`;
-  
-  // 3. 최종 쿼리 생성 (URL 인코딩 불필요)
-  // 참고: 원래 코드에서는 pubTypeQuery와 diseaseQuery가 finalQuery에 포함되지 않았습니다. 
-  // 필요하다면 여기에 AND 또는 OR로 결합해야 합니다. 여기서는 원래 코드와 동일하게 구성합니다.
-  const finalQuery = `((${journalQuery}) AND (${meshQuery})) AND (${dateRange})`; 
-  // const finalQuery = `((${journalQuery} OR ${pubTypeQuery} OR ${diseaseQuery}) AND (${meshQuery})) AND (${dateRange})`; // 예시: 다른 조건 포함 시
+  const dateRange = `"${startDate}"[EDAT] : "${endDate}"[EDAT]`;
+
+  // 3. 최종 쿼리 생성
+  // MeSH Terms OR 제목 키워드로 검색 (MeSH 인덱싱 지연 대응)
+  const keywordQuery = `(${meshQuery}) OR (${diseaseQuery})`;
+  const finalQuery = `(${journalQuery}) AND (${keywordQuery}) AND (${dateRange})`;
 
   // 4. PubMed ESearch API URL
   const esearchUrl = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';

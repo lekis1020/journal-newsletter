@@ -108,6 +108,8 @@ function fetchPubMedWeeklyAndSave() {
   // 1. 검색 쿼리 준비
   const journalQuery = CONFIG.JOURNALS.map(journal => `"${journal}"[Journal]`).join(" OR ");
   const pubTypeQuery = CONFIG.PUB_TYPES.map(type => `"${type}"[Publication Type]`).join(" OR ");
+  const meshTerms = ["asthma","urticaria","angioedema","dermatitis,atopic","drug hypersensitivity","anaphylaxis","rhinitis","sinusitis","food hypersensitivity","eosinophilia"];
+  const meshQuery = meshTerms.map(term => `"${term}"[MeSH Terms]`).join(" OR ");
   const diseaseTerms = ["asthma", "urticaria", "angioedema", "atopic dermatitis","drug allergy","anaphylaxis"];
   const diseaseQuery = diseaseTerms.map(term => `"${term}"[Title]`).join(" OR ");
 
@@ -125,10 +127,11 @@ function fetchPubMedWeeklyAndSave() {
   
   const startDate = formatDate(oneWeekAgo);
   const endDate = formatDate(today);
-  const dateRange = `"${startDate}"[PDAT] : "${endDate}"[PDAT]`;
+  const dateRange = `"${startDate}"[EDAT] : "${endDate}"[EDAT]`;
   
   // 3. 최종 쿼리 생성 및 URL 인코딩
-  const finalQuery = `(${journalQuery}) AND (${pubTypeQuery}) AND (${diseaseQuery}) AND (${dateRange})`;
+  const keywordQuery = `(${meshQuery}) OR (${diseaseQuery})`;
+  const finalQuery = `(${journalQuery}) AND (${pubTypeQuery}) AND (${keywordQuery}) AND (${dateRange})`;
   const encodedQuery = encodeURIComponent(finalQuery);
   
   // 4. PubMed API 호출
