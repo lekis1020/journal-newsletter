@@ -48,6 +48,8 @@ const CONFIG = {
   ],
   DAYS_RANGE: 7,                     // 몇 일 전 논문부터 검색할지
   MAX_RESULTS: 100,                    // 최대 검색 결과 수
+  MIN_RELEVANCE_SCORE: 3,              // 최소 관련성 점수
+  MAX_INCLUSION: 15,                   // Top N 논문만 요약
   EMAIL_RECIPIENTS: '',  // Script Properties에서 가져옴
   EMAIL_TO_PRIMARY: '',  // Script Properties에서 가져옴
   EMAIL_SUBJECT_PREFIX: '[Ajou Allergy Journal Letter]', // 이메일 제목 접두사
@@ -80,6 +82,45 @@ function getSecret(key, fallback) {
   return value || fallback || '';
 }
 
+function buildColumnLayout(existingHeaders, desiredHeaders) {
+  const finalHeaders = existingHeaders.slice();
+  const headersToAppend = [];
+  const indexMap = {};
+
+  desiredHeaders.forEach(function(header) {
+    let idx = finalHeaders.indexOf(header);
+    if (idx === -1) {
+      headersToAppend.push(header);
+      finalHeaders.push(header);
+      idx = finalHeaders.length - 1;
+    }
+    indexMap[header] = idx;
+  });
+
+  return { finalHeaders: finalHeaders, headersToAppend: headersToAppend, indexMap: indexMap };
+}
+
+function ensureSheetColumns(sheet, headers, desiredHeaders) {
+  const layout = buildColumnLayout(headers, desiredHeaders);
+  if (layout.headersToAppend.length > 0) {
+    sheet.getRange(1, headers.length + 1, 1, layout.headersToAppend.length).setValues([layout.headersToAppend]);
+  }
+  return layout.indexMap;
+}
+
+function shouldSummarizeRow(includedValue, hasIncludedColumn) {
+  if (!hasIncludedColumn) return true;
+  return includedValue === "O" || includedValue === "" || typeof includedValue === "undefined";
+}
+
+function formatPaperDateValue(dateValue, utilitiesRef) {
+  if (!dateValue) return "";
+  if (dateValue instanceof Date) {
+    return utilitiesRef.formatDate(dateValue, "GMT+9", "yyyy년 MM월 dd일");
+  }
+  return String(dateValue);
+}
+
 // ===== 2. 메인 실행 함수 =====
 
 /**
@@ -96,6 +137,7 @@ function fetchAndSummarizeAll() {
   const spreadsheet = fetchPubMedWeeklyAndSave_POST();  // 스프레드시트 객체 반환
   if (spreadsheet) {
     SpreadsheetApp.setActiveSpreadsheet(spreadsheet);  // 새로 생성된 스프레드시트를 활성화
+    scoreAndFilterPapers(spreadsheet);
     summarizePubMedArticlesWithGPT(spreadsheet);  // 별도 인자 없이 실행
   }
 }
@@ -549,11 +591,127 @@ function callGPT(prompt) {
   return json.choices[0].message.content.trim();
 }
 
+// ===== GPT JSON 모드 호출 (스코어링용) =====
+
+function callGPTJson(prompt) {
+  const url = "https://api.openai.com/v1/chat/completions";
+  const payload = {
+    model: CONFIG.GPT_MODEL,
+    messages: [
+      { role: "system", content: "You analyze medical papers for keywords. Return only valid JSON." },
+      { role: "user", content: prompt }
+    ],
+    max_completion_tokens: 500,
+    reasoning_effort: "minimal",
+    response_format: { type: "json_object" }
+  };
+
+  const options = {
+    method: "post",
+    contentType: "application/json",
+    headers: { Authorization: `Bearer ${getSecret('OPENAI_API_KEY')}` },
+    payload: JSON.stringify(payload),
+    muteHttpExceptions: true
+  };
+
+  for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 1) {
+        Utilities.sleep(CONFIG.RETRY_DELAY * Math.pow(CONFIG.RETRY_MULTIPLIER, attempt - 2));
+      }
+      const res = UrlFetchApp.fetch(url, options);
+      if (res.getResponseCode() !== 200) {
+        throw new Error(JSON.parse(res.getContentText()).error?.message || `Status ${res.getResponseCode()}`);
+      }
+      const json = JSON.parse(res.getContentText());
+      const content = json.choices && json.choices[0] && json.choices[0].message && json.choices[0].message.content;
+      if (content) return content.trim();
+    } catch (e) {
+      console.error(`GPT JSON 오류 (${attempt}/${CONFIG.MAX_RETRIES}):`, e.message);
+      if (attempt >= CONFIG.MAX_RETRIES) break;
+    }
+  }
+  return null;
+}
+
+// ===== 스코어링 & Top N 필터링 =====
+
+function scoreAndFilterPapers(spreadsheet) {
+  const sheet = spreadsheet.getSheetByName("journal_crawl_db");
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+
+  const titleIdx = headers.indexOf("Title");
+  const abstractIdx = headers.indexOf("Abstract");
+  if (titleIdx === -1 || abstractIdx === -1) { console.error("필수 컬럼 누락"); return; }
+
+  const scoreCols = ["Scores", "Final Score", "Included", "Exclusion Reason"];
+  const scoreColMap = ensureSheetColumns(sheet, headers, scoreCols);
+
+  const rows = data.slice(1);
+  const results = rows.map(function(row, i) {
+    var title = row[titleIdx];
+    var abstract = String(row[abstractIdx] || "").trim();
+
+    if (!abstract) return { details: "No Abstract", score: 0, included: false, reason: "No Abstract" };
+
+    try {
+      var jsonStr = callGPTJson('Detect keywords in title/abstract:\n\nTitle: "' + title + '"\nAbstract: "' + abstract + '"\n\nCategories:\n1. CUTANEOUS_ALLERGY: urticaria, angioedema, anaphylaxis, food allergy, drug allergy, drug hypersensitivity, food hypersensitivity, mast cell, mastocytosis\n2. DERMATOLOGY: atopic dermatitis, eczema, contact dermatitis, prurigo, vasculitis, Stevens-Johnson, toxic epidermal necrolysis, cutaneous, dermatitis\n\nReturn JSON: {"hasCutAllergyInTitle":true/false,"hasCutAllergyInAbstract":true/false,"hasDermaInTitle":true/false,"hasDermaInAbstract":true/false}');
+
+      if (!jsonStr) return { details: "GPT Error", score: 0, included: false, reason: "GPT 응답 없음" };
+
+      var cleanStr = jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
+      var f = JSON.parse(cleanStr);
+
+      var cutScore = (f.hasCutAllergyInTitle && f.hasCutAllergyInAbstract) ? 5
+        : (f.hasCutAllergyInTitle ? 2 : 0) + (f.hasCutAllergyInAbstract ? 2 : 0);
+      var dermaScore = (f.hasDermaInTitle && f.hasDermaInAbstract) ? 5
+        : (f.hasDermaInTitle ? 2 : 0) + (f.hasDermaInAbstract ? 2 : 0);
+      var score = Math.max(cutScore, dermaScore);
+
+      Utilities.sleep(500);
+      return {
+        details: JSON.stringify(f), score: score,
+        included: score >= CONFIG.MIN_RELEVANCE_SCORE,
+        reason: "Cut(" + cutScore + ") Derma(" + dermaScore + ") = " + score
+      };
+    } catch (e) {
+      console.error("Row " + (i + 2) + " scoring error:", e);
+      return { details: "Error", score: 0, included: false, reason: e.message };
+    }
+  });
+
+  // Top N 선정
+  var passed = [];
+  for (var i = 0; i < results.length; i++) {
+    if (results[i].included) passed.push({ idx: i, score: results[i].score });
+  }
+  passed.sort(function(a, b) { return b.score - a.score; });
+
+  var topSet = {};
+  for (var j = 0; j < Math.min(passed.length, CONFIG.MAX_INCLUSION); j++) {
+    topSet[passed[j].idx] = true;
+  }
+
+  var updates = results.map(function(r, idx) {
+    var isFinal = r.included && topSet[idx];
+    var reason = (r.included && !topSet[idx]) ? r.reason + " (Top " + CONFIG.MAX_INCLUSION + " 초과)" : r.reason;
+    return [r.details, r.score, isFinal ? "O" : "X", reason];
+  });
+
+  scoreCols.forEach(function(header, colOffset) {
+    var columnValues = updates.map(function(row) { return [row[colOffset]]; });
+    sheet.getRange(2, scoreColMap[header] + 1, columnValues.length, 1).setValues(columnValues);
+  });
+
+  var includedCount = updates.filter(function(u) { return u[2] === "O"; }).length;
+  console.log("스코어링 완료: " + rows.length + "건 중 " + includedCount + "건 선정");
+}
+
 /**
  * @param {SpreadsheetApp.Spreadsheet} spreadsheet - 요약 논문 결과 스프레드시트
  * @return {string} GPT 요약 결과
  */
-// 3. summarizePubMedArticlesWithGPT 함수 수정 - 스프레드시트 매개변수 추가
 
 function summarizePubMedArticlesWithGPT(spreadsheet) {
   console.log("논문 GPT 요약 작업 시작...");
@@ -589,28 +747,30 @@ function summarizePubMedArticlesWithGPT(spreadsheet) {
   const pmidIndex = headers.indexOf("PMID");
   const pubtypeIdx = headers.indexOf("Publication Type");
   const abstractIdx = headers.indexOf("Abstract");
-  
+  const includedIdx = headers.indexOf("Included");
+
   // 필수 열 확인
   if (titleIdx === -1 || abstractIdx === -1 || pmidIndex === -1) {
     return "필수 열(제목, PMID, 초록)을 찾을 수 없습니다.";
   }
   const lastCol = sheet.getLastColumn();
-  
+
   // 요약 결과 열 추가
-  const targetCol = lastCol + 1;
-  sheet.getRange(1, targetCol).setValue(MESSAGES.SUMMARY_HEADER);
-  
-// 데이터 전체 가져오기
+  const summaryColMap = ensureSheetColumns(sheet, headers, [MESSAGES.SUMMARY_HEADER]);
+  const targetCol = summaryColMap[MESSAGES.SUMMARY_HEADER] + 1;
+
+  // 데이터 전체 가져오기
   const dataRows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
 
   let successCount = 0;
   let failCount = 0;
   const startTime = new Date().getTime();
-  //let lastSaveTime = startTime;
-  //console.log(`총 ${pmids.length}개의 PMID에 대해 요약을 진행합니다.`);
-  
 
-for (let i = 0; i < dataRows.length; i++) {
+  for (let i = 0; i < dataRows.length; i++) {
+    // Included="O" 만 요약 (스코어링 단계가 있는 경우)
+    if (!shouldSummarizeRow(dataRows[i][includedIdx], includedIdx !== -1)) {
+      continue;
+    }
     const rowIndex = i + 2;
     const row = dataRows[i];
 
@@ -632,7 +792,7 @@ for (let i = 0; i < dataRows.length; i++) {
     if (!abstract) {
       console.log(`행 ${rowIndex}: 초록이 없어서 스킵`);
       //sheet.getRange(rowIndex, targetCol).setValue(MESSAGES.NO_ABSTRACT);
-      const formattedDate = Utilities.formatDate(date, "GMT+9", "yyyy년 MM월 dd일");
+      const formattedDate = formatPaperDateValue(date, Utilities);
       const message = `초록이 없습니다.\n 📅: ${formattedDate} \n 📒: ${journal}\n ${pubtype}\n👥: ${authors}`;
       sheet.getRange(rowIndex, targetCol).setValue(message);
       
@@ -772,4 +932,11 @@ No hallucination
   return resultMsg;
 }
 
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    buildColumnLayout,
+    shouldSummarizeRow,
+    formatPaperDateValue
+  };
+}
 

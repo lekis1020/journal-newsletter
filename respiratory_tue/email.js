@@ -48,56 +48,69 @@ function sendSummariesToEmail(spreadsheet) {
     const pmidColIndex = headers.indexOf("PMID");
     const pubTypeColIndex = headers.indexOf("Publication Type");
     const summaryColIndex = headers.indexOf(MESSAGES.SUMMARY_HEADER);
-    
+    const includedColIndex = headers.indexOf("Included");
+
     if (titleColIndex === -1 || pmidColIndex === -1 || summaryColIndex === -1) {
       console.error("필요한 열을 찾을 수 없습니다.");
       return "필요한 열 없음";
     }
-    
+
+    // ✅ Included="O" + 유효한 요약이 있는 논문만 사전 필터링
+    const filteredData = data.filter((row, index) => {
+      if (includedColIndex === -1) {
+        return true;
+      }
+      const included = row[includedColIndex];
+      const s = row[summaryColIndex] || "";
+      const hasSummary = s && !s.startsWith("초록이 없습니다") && !s.startsWith("오류:") && s !== "요약 정보 없음";
+
+      if (included === "O" && hasSummary) {
+        console.log(`Row ${index + 2}: Included="O" with summary, adding to email`);
+        return true;
+      } else {
+        console.log(`Row ${index + 2}: Included="${included}", hasSummary=${hasSummary}, skipping`);
+        return false;
+      }
+    });
+
+    console.log(`Total papers: ${data.length}, Filtered papers for email: ${filteredData.length}`);
+
+    if (filteredData.length === 0) {
+      console.log("Included='O'인 논문이 없어서 이메일을 전송하지 않습니다.");
+      return "필터링된 논문 없음";
+    }
+
     // 현재 날짜 형식화
     const today = new Date();
-    const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyy-MM-dd");
-
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - CONFIG.DAYS_RANGE);
 
     function formatKoreanDate(date) {
-      return `${date.getMonth() + 1}월 ${date.getDate()}일`;  
+      return `${date.getMonth() + 1}월 ${date.getDate()}일`;
     }
-  
+
     const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
-    Logger.log(searchPeriod); 
+    Logger.log(searchPeriod);
 
-
-    // 요약이 있는 논문 수 사전 집계
-    const validCount = data.filter(row => {
-      const s = row[summaryColIndex] || "";
-      return s && !s.startsWith("초록이 없습니다") && !s.startsWith("오류:") && s !== "요약 정보 없음";
-    }).length;
-
-    // 이메일 제목
-    const emailSubject = `[Ajou Allergy Journal Letter] Respiratory disease (Asthma/Rhinitis/Sinusitis) - 총 ${validCount}개 논문`;
+    // ✅ 이메일 제목: 필터링된 논문 수 사용
+    const emailSubject = `[Ajou Allergy Journal Letter] Respiratory disease ${searchPeriod} - 총 ${filteredData.length}개 논문`;
 
     // 이메일 본문 시작
     let emailBody = `<div style="font-family: Arial, sans-serif;">`;
     emailBody += `<h4>최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) Asthma/Rhinitis/Sinusitis 관련 논문 요약 </h4>`;
-    emailBody += `<p>총 ${lastRow - 1}개 검색 중 ${validCount}개의 논문 요약을 공유합니다.</p>`;
+    emailBody += `<p>총 ${data.length}개 검색 중 상위 ${filteredData.length}개의 논문 요약을 공유합니다.</p>`;
     emailBody += `<hr style="margin: 20px 0;">`;
 
-    // 각 논문 정보 추가 (초록 없는 논문 및 요약 실패 건 제외)
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
+    // ✅ 각 논문 정보 추가 (필터링된 데이터만)
+    for (let i = 0; i < filteredData.length; i++) {
+      const row = filteredData[i];
 
       const title = row[titleColIndex] || "제목 정보 없음";
       const journal = journalColIndex !== -1 ? row[journalColIndex] : "저널 정보 없음";
       const date = dateColIndex !== -1 ? row[dateColIndex] : "";
       const pmid = row[pmidColIndex] || "PMID 정보 없음";
       const pubType = pubTypeColIndex !== -1 ? row[pubTypeColIndex] : "출판 유형 정보 없음";
-      const summary = row[summaryColIndex] || "";
-
-      if (!summary || summary.startsWith("초록이 없습니다") || summary.startsWith("오류:") || summary === "요약 정보 없음") {
-        continue;
-      }
+      const summary = row[summaryColIndex] || "요약 정보 없음";
       
       // PubMed 링크 생성
       const pubmedLink = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;

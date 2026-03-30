@@ -1,8 +1,53 @@
 
 /**
+ * 한국어 날짜 포맷 (email, total 공용)
+ */
+function formatKoreanDate(date) {
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
+}
+
+/**
+ * 요약 텍스트를 줄 단위로 분리
+ * @param {string} summary - GPT 요약 텍스트
+ * @return {string[]} 줄 배열
+ */
+function buildPaperSummaryLines(summary) {
+  return String(summary || "")
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean);
+}
+
+/**
+ * 요약 줄을 이메일용 HTML div로 변환
+ * @param {string} summary - GPT 요약 텍스트
+ * @return {string} HTML 문자열
+ */
+function formatSummaryForEmail(summary) {
+  const lines = buildPaperSummaryLines(summary);
+
+  return lines.map(line => {
+    const isTagLine = /Tag\s*:/.test(line);
+    const baseStyle = [
+      "display:block",
+      "margin:0 0 8px 0",
+      "font-size:17px",
+      "line-height:1.7",
+      "color:#134E4A"
+    ];
+
+    if (isTagLine) {
+      baseStyle.push("color:#0891B2", "font-weight:600");
+    }
+
+    return `<div style="${baseStyle.join(";")}">${line}</div>`;
+  }).join("");
+}
+
+/**
  * 논문 요약 결과를 이메일로 전송하는 함수
  * @param {SpreadsheetApp.Spreadsheet} spreadsheet - 논문 데이터가 있는 스프레드시트
- * @return {string} 처리 결과
+ * @return {{ok: boolean, subject: string, emailBody: string}|string} 처리 결과
  */
 function sendSummariesToEmail(spreadsheet) {
   try {
@@ -10,7 +55,6 @@ function sendSummariesToEmail(spreadsheet) {
     if (!spreadsheet) {
       console.error("스프레드시트 객체가 전달되지 않았습니다.");
       try {
-        // 현재 활성화된 스프레드시트를 대신 사용
         spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
         console.log("현재 활성화된 스프레드시트를 사용합니다: " + spreadsheet.getName());
       } catch (e) {
@@ -18,29 +62,27 @@ function sendSummariesToEmail(spreadsheet) {
         return "스프레드시트를 찾을 수 없습니다.";
       }
     }
-    
+
     // 시트 가져오기
     const sheet = spreadsheet.getSheetByName('journal_crawl_db');
     if (!sheet) {
       console.error("'journal_crawl_db' 시트를 찾을 수 없습니다.");
       return "시트 없음";
     }
-    
+
     // 데이터 범위와 헤더 가져오기
     const lastRow = sheet.getLastRow();
     const lastCol = sheet.getLastColumn();
-    
+
     if (lastRow <= 1) {
       console.error("전송할 데이터가 없습니다.");
       return "데이터 없음";
     }
-    
+
     // 전체 데이터와 헤더 가져오기
-    const headerRange = sheet.getRange(1, 1, 1, lastCol);
-    const headers = headerRange.getValues()[0];
-    const dataRange = sheet.getRange(2, 1, lastRow - 1, lastCol);
-    const data = dataRange.getValues();
-    
+    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+
     // 필요한 열 인덱스 찾기
     const titleColIndex = headers.indexOf("Title");
     const journalColIndex = headers.indexOf("Journal");
@@ -48,120 +90,108 @@ function sendSummariesToEmail(spreadsheet) {
     const pmidColIndex = headers.indexOf("PMID");
     const pubTypeColIndex = headers.indexOf("Publication Type");
     const summaryColIndex = headers.indexOf(MESSAGES.SUMMARY_HEADER);
-    
+    const includedColIndex = headers.indexOf("Included");
+
     if (titleColIndex === -1 || pmidColIndex === -1 || summaryColIndex === -1) {
       console.error("필요한 열을 찾을 수 없습니다.");
       return "필요한 열 없음";
     }
-    
+
+    // ✅ Included="O" + 유효한 요약이 있는 논문만 사전 필터링
+    const filteredData = data.filter((row, index) => {
+      if (includedColIndex === -1) {
+        return true;
+      }
+      const included = row[includedColIndex];
+      const s = row[summaryColIndex] || "";
+      const hasSummary = s && !s.startsWith("초록이 없습니다") && !s.startsWith("오류:") && s !== "요약 정보 없음";
+
+      if (included === "O" && hasSummary) {
+        console.log(`Row ${index + 2}: Included="O" with summary, adding to email`);
+        return true;
+      } else {
+        console.log(`Row ${index + 2}: Included="${included}", hasSummary=${hasSummary}, skipping`);
+        return false;
+      }
+    });
+
+    console.log(`Total papers: ${data.length}, Filtered papers for email: ${filteredData.length}`);
+
+    // ✅ 필터링된 논문이 없으면 이메일 전송 안 함
+    if (filteredData.length === 0) {
+      console.log("Included='O'인 논문이 없어서 이메일을 전송하지 않습니다.");
+      return "필터링된 논문 없음";
+    }
+
     // 현재 날짜 형식화
     const today = new Date();
-    const formattedDate = Utilities.formatDate(today, "GMT+9", "yyyy-MM-dd");
-
     const startDate = new Date(today);
     startDate.setDate(today.getDate() - CONFIG.DAYS_RANGE);
-
-    function formatKoreanDate(date) {
-      return `${date.getMonth() + 1}월 ${date.getDate()}일`;  
-    }
-  
     const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
-    Logger.log(searchPeriod); 
+    Logger.log(searchPeriod);
 
-
-    // 요약이 있는 논문 수 사전 집계
-    const validCount = data.filter(row => {
-      const s = row[summaryColIndex] || "";
-      return s && !s.startsWith("초록이 없습니다") && !s.startsWith("오류:") && s !== "요약 정보 없음";
-    }).length;
-
-    // 이메일 제목
-    const emailSubject = `[Ajou Allergy Journal Letter] Cutaneous diseases ${searchPeriod} - 총 ${validCount}개 논문`;
+    // ✅ 이메일 제목: 필터링된 논문 수 사용
+    const subject = `[Ajou Allergy Journal Letter] Cutaneous diseases ${searchPeriod} - 총 ${filteredData.length}개 논문`;
 
     // 이메일 본문 시작
-    let emailBody = `<div style="font-family: Arial, sans-serif;">`;
-    emailBody += `<h4>최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) Urticaria/Angioedema/Food/Drug/Atopic dermatitis 논문 요약 </h4>`;
-    emailBody += `<p>총 ${lastRow - 1}개 검색 중 ${validCount}개의 논문 요약을 공유합니다.</p>`;
-    //emailBody += `<p>스프레드시트 링크: <a href="${spreadsheet.getUrl()}">${spreadsheet.getName()}</a></p>`;
+    let emailBody = `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif;">`;
+    emailBody += `
+    <h4 style="
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    ">
+      최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) Urticaria/Angioedema/Anaphylaxis/Food/Drug/Atopic dermatitis 논문 요약</h4>`;
+    emailBody += `
+    <p style="
+      font-size: 16px;
+      font-weight: 600;
+      margin: 8px 0 18px 0;
+    ">
+      총 ${data.length}개 검색 중 상위 ${filteredData.length}개의 논문 요약을 공유합니다.</p>`;
     emailBody += `<hr style="margin: 20px 0;">`;
-    
-    // 각 논문 정보 추가 (초록 없는 논문 및 요약 실패 건 제외)
-    let includedCount = 0;
-    for (let i = 0; i < data.length; i++) {
-      const row = data[i];
+
+    // ✅ 각 논문 정보 추가 (사전 필터링된 데이터만)
+    for (let i = 0; i < filteredData.length; i++) {
+      const row = filteredData[i];
 
       const title = row[titleColIndex] || "제목 정보 없음";
       const journal = journalColIndex !== -1 ? row[journalColIndex] : "저널 정보 없음";
       const date = dateColIndex !== -1 ? row[dateColIndex] : "";
       const pmid = row[pmidColIndex] || "PMID 정보 없음";
       const pubType = pubTypeColIndex !== -1 ? row[pubTypeColIndex] : "출판 유형 정보 없음";
-      const summary = row[summaryColIndex] || "";
+      const summary = row[summaryColIndex] || "요약 정보 없음";
 
-      // 초록 없음/요약 실패 건 제외
-      if (!summary || summary.startsWith("초록이 없습니다") || summary.startsWith("오류:") || summary === "요약 정보 없음") {
-        continue;
-      }
-      includedCount++;
-      
       // PubMed 링크 생성
       const pubmedLink = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
-      
-      // 요약 본문에서 정보 추출 (GPT 요약 형식에 따라 조정 필요)
-      let authors = "정보 없음";
-      let researchType = pubType || "정보 없음";
-      
-      // GPT 요약에서 저자 정보와 연구 유형 추출 시도
-      //if (summary && summary.includes("* 저자:")) {
-      //  const authorMatch = summary.match(/\* 저자:\s*([^\n]*)/);
-      //  if (authorMatch && authorMatch[1]) {
-      //    authors = authorMatch[1].trim();
-      //  }
-      //}
-      
-      //if (summary && summary.includes("* 연구 방법:")) {
-      //  const methodMatch = summary.match(/\* 연구 방법:\s*([^\n]*)/);
-      //  if (methodMatch && methodMatch[1]) {
-      //    researchType = methodMatch[1].trim();
-      //  }
-      //}
-      
-      // 논문 요약 포맷팅
-      emailBody += `<div style="margin-bottom: 30px; border: 1px solid #ddd; padding: 15px; border-radius: 5px;">`;
-      emailBody += `<div style="border-bottom: 1px dashed #ccc; padding-bottom: 10px; margin-bottom: 10px;">`;
-      emailBody += `<div style="font-size: 18px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;">📔: ${title}</div>`;
-      
-      // 구분선과 논문 정보
-      emailBody += `<div style="color: #555; font-size: 14px;">`;
-      //emailBody += `────────────────────────────── <br>`;
-      //emailBody += `<strong>제목:</strong> ${title}<br>`;
-      //emailBody += `<strong>게재일:</strong> ${year || "정보 없음"}<br>`;
-      //emailBody += `<strong>저자:</strong> ${authors}<br>`;
-      //emailBody += `<strong>연구 유형:</strong> ${researchType}<br>`;
-      //emailBody += `<strong>저널:</strong> ${journal}<br>`;
-      //emailBody += `<strong>요약:</strong><br>`;
+
+      // 논문 카드
+      emailBody += `<div style="margin-bottom: 30px; border: 1px solid #B2DFDB; padding: 15px; border-radius: 5px; background-color: #FFFFFF;">`;
+      // 제목 헤더
+      emailBody += `<div style="border-bottom: 2px solid #0891B2; padding-bottom: 10px; margin-bottom: 10px;">`;
+      emailBody += `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; color: #0F766E; margin-bottom: 10px;">📔: ${title}</div>`;
       emailBody += `</div>`;
+
+      // 요약 내용 (이모지 구조화 렌더링 유지)
+      emailBody += `<div style="font-size: 16px; line-height: 1.7; color: #134E4A; background-color: #F0FDFA; padding: 12px 14px; border-left: 4px solid #0891B2;">`;
+      emailBody += formatSummaryForEmail(summary);
       emailBody += `</div>`;
-      
-      // 요약 내용
-      emailBody += `<div style="font-size: 16px; line-height: 1.7; color: #333; background-color: #f9f9f9; padding: 10px; border-left: 4px solid #4285f4;">`;
-      emailBody += summary.replace(/\n/g, '<br>');
-      emailBody += `</div>`;
-      
+
       // 링크 및 구분선
-      emailBody += `<div style="margin-top: 10px; font-size: 14px;">`;
-      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank">${pubmedLink}</a><br>`;
-      emailBody += `────────────────────────────── `;
+      emailBody += `<div style="margin-top: 10px; font-size: 14px; color: #134E4A;">`;
+      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank" style="color: #0891B2;">${pubmedLink}</a>`;
       emailBody += `</div>`;
       emailBody += `</div>`;
     }
-    
+
     // 이메일 본문 마무리
-    emailBody += `<hr style="margin: 20px 0;">`;
-    emailBody += '<p> 다음 MeSH Term 을 가진 논문들을 검색합니다. <br> Urticaria, Angioedema, Anaphylaxis, Atopic dermatitis, Vasculitis, Prurigo, Contact dermatitis, <br> Drug hypersensitivity, Stevens-Johnson Syndrome, Toxic Epidermal Necrolysis, food hypersensitivity </p>';
-    emailBody += '<p> 다음 저널에서 검색합니다. <br> The Journal of allergy and clinical immunology, Allergy, Annals of allergy, asthma & immunology, Clinical and experimental allergy, The journal of allergy and clinical immunology. In practice, Allergology international, The World Allergy Organization journal, NEJM evidence, The New England journal of medicine, Frontiers in Immunology, Journal of Cutaneous Immunology and Allergy, American journal of respiratory and critical care medicine, Journal of Investigational Allergology and Clinical Immunology, Allergy and asthma proceedings, Allergy, asthma, and clinical immunology, Journal of immunotoxicology, International journal of dermatology, Contact dermatitis, Allergy, Asthma and Immunology Research, Allergy, Asthma and Respiratory Disease </p>';
-    emailBody += `<p style="color: #777; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
+    emailBody += `<hr style="margin: 20px 0; border-color: #B2DFDB;">`;
+    emailBody += '<p style="font-size: 16px; color: #134E4A;"> <br> 최근 7일(전자출판기준) 발표된 Cutaneous allergy 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
+    emailBody += '<p style="color: #134E4A;"> 다음 MeSH Term 을 가진 논문들을 검색합니다. <br> Urticaria, Angioedema, Anaphylaxis, Atopic dermatitis, Vasculitis, Prurigo, Contact dermatitis, <br> Drug hypersensitivity, Stevens-Johnson Syndrome, Toxic Epidermal Necrolysis, food hypersensitivity </p>';
+    emailBody += '<p style="color: #134E4A;"> 다음 저널에서 검색합니다. <br> The Journal of allergy and clinical immunology, Allergy, Annals of allergy, asthma & immunology, Clinical and experimental allergy, The journal of allergy and clinical immunology. In practice, Allergology international, The World Allergy Organization journal, NEJM evidence, The New England journal of medicine, Frontiers in Immunology, Journal of Cutaneous Immunology and Allergy, American journal of respiratory and critical care medicine, Journal of Investigational Allergology and Clinical Immunology, Allergy and asthma proceedings, Allergy, asthma, and clinical immunology, Journal of immunotoxicology, International journal of dermatology, Contact dermatitis, Allergy, Asthma and Immunology Research, Allergy, Asthma and Respiratory Disease </p>';
+    emailBody += `<p style="color: #0F766E; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
-    
+
     // 플레인 텍스트 버전 생성 (HTML 태그 제거)
     const plainText = emailBody
       .replace(/<[^>]*>/g, '')
@@ -170,29 +200,33 @@ function sendSummariesToEmail(spreadsheet) {
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"');
-    
-    // 이메일 수신자 설정 (필요에 따라 조정)
-    //const recipients = Session.getActiveUser().getEmail();
+
+    // 이메일 수신자 설정
     const recipients = getSecret('EMAIL_RECIPIENTS');
-    
+
     // 이메일 전송
     MailApp.sendEmail({
       to: getSecret('EMAIL_TO_PRIMARY'),
-      subject: emailSubject,
+      subject: subject,
       htmlBody: emailBody,
       body: plainText,
       bcc: recipients,
       name: "논문 요약 자동화"
     });
-    
+
+    console.log("DEBUG mail subject:", subject);
     console.log(`${recipients}에게 이메일 전송 완료`);
-    return "이메일 전송 완료";
-    
+    return { ok: true, subject, emailBody };
+
   } catch (error) {
     console.error("이메일 전송 오류:", error);
     return `이메일 전송 오류: ${error.message}`;
   }
 }
 
-
-
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    buildPaperSummaryLines,
+    formatSummaryForEmail
+  };
+}

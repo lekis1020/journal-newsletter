@@ -6,24 +6,29 @@ function fetchSummarizeAndSendByEmail() {
     console.log("워크플로우 시작...");
     const spreadsheet = fetchPubMedWeeklyAndSave_POST();
     console.log("논문 검색 및 저장 완료: " + (spreadsheet ? "성공" : "실패"));
-    
+
     if (spreadsheet) {
-      console.log("GPT 요약 시작...");
+      console.log("GPT 스코어링 시작...");
+      scoreAndFilterPapers(spreadsheet);
+      console.log("GPT 스코어링 완료");
+
+      console.log("GPT 요약 시작 (Included=O 만)...");
       summarizePubMedArticlesWithGPT(spreadsheet);
       console.log("GPT 요약 완료");
-      
+
       console.log("이메일 전송 시작...");
-      const result = sendSummariesToEmail(spreadsheet);
-      console.log("이메일 전송 결과: " + result);
-      return result;
+      const mailResult = sendSummariesToEmail(spreadsheet);
+      if (mailResult && mailResult.ok) {
+        console.log("이메일 전송 완료: " + mailResult.subject);
+      } else {
+        console.log("이메일 전송 결과: " + mailResult);
+      }
+      return mailResult;
     } else {
       const message = "금주 검색 대상 논문이 없습니다.";
       console.warn(message);
       sendNoResultsEmail(message);
       return message;
-      //const errorMsg = "스프레드시트가 생성되지 않아 이후 과정을 건너뜁니다.";
-      //console.error(errorMsg);
-      //return errorMsg;
     }
   } catch (error) {
     console.error("워크플로우 실행 오류:", error);
@@ -43,10 +48,6 @@ function sendNoResultsEmail(message) {
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - CONFIG.DAYS_RANGE);
 
-  function formatKoreanDate(date) {
-    return `${date.getMonth() + 1}월 ${date.getDate()}일`;  
-  }
-  
   const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
   Logger.log(searchPeriod); 
 

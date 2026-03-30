@@ -1,7 +1,9 @@
 .omc/
+.omx/
 .clasp.json
 node_modules/
 .DS_Store
+._*
 .env
 .env.*
 !.env.example
