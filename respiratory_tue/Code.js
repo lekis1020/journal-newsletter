@@ -329,16 +329,26 @@ function summarizePubMedArticlesWithGPT(spreadsheet) {
   const summaryColMap = ensureSheetColumns(sheet, headers, [MESSAGES.SUMMARY_HEADER]);
   const targetCol = summaryColMap[MESSAGES.SUMMARY_HEADER] + 1;
 
+  const summaryIdx = summaryColMap[MESSAGES.SUMMARY_HEADER];
   const dataRows = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
 
   let successCount = 0;
   let failCount = 0;
+  let skipCount = 0;
   const startTime = new Date().getTime();
 
   for (let i = 0; i < dataRows.length; i++) {
     if (!shouldSummarizeRow(dataRows[i][includedIdx], includedIdx !== -1)) {
       continue;
     }
+
+    // 이미 요약이 있으면 스킵 (배치 재실행 시 이어서 처리)
+    const existingSummary = String(dataRows[i][summaryIdx] || "").trim();
+    if (existingSummary && !existingSummary.startsWith("오류:")) {
+      skipCount++;
+      continue;
+    }
+
     const rowIndex = i + 2;
     const row = dataRows[i];
 
@@ -427,7 +437,7 @@ No hallucination
 
   try { SpreadsheetApp.flush(); } catch (flushErr) { console.error("마지막 flush 오류:", flushErr); }
 
-  const resultMsg = `요약 작업 완료! 성공: ${successCount}, 실패: ${failCount}`;
+  const resultMsg = `요약 작업 완료! 성공: ${successCount}, 실패: ${failCount}, 기존 스킵: ${skipCount}`;
   console.log(resultMsg);
   return resultMsg;
 }
