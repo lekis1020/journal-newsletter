@@ -25,9 +25,9 @@ function phase1_fetchAndScore() {
     if (spreadsheet) {
       saveLastSpreadsheetId(spreadsheet);
 
-      console.log("GPT 스코어링 시작...");
+      console.log("Regex 스코어링 시작...");
       scoreAndFilterPapers(spreadsheet);
-      console.log("GPT 스코어링 완료");
+      console.log("Regex 스코어링 완료");
 
       console.log("Phase 1 완료. Phase 2를 실행하세요.");
       return "Phase 1 완료";
@@ -53,9 +53,9 @@ function phase2_summarizeAndEmail() {
 
     console.log("스프레드시트: " + spreadsheet.getName());
 
-    console.log(`GPT 요약 시작 (배치 ${CONFIG.SUMMARY_BATCH_SIZE}건, Included=O 만)...`);
-    const result = summarizePubMedArticlesWithGPT(spreadsheet);
-    console.log(`GPT 요약 완료 — 성공: ${result.successCount}, 실패: ${result.failCount}, 잔여: ${result.remaining}`);
+    console.log(`Gemini 요약 시작 (배치 ${CONFIG.SUMMARY_BATCH_SIZE}건, Included=O 만)...`);
+    const result = summarizePubMedArticlesWithGemini(spreadsheet);
+    console.log(`Gemini 요약 완료 — 성공: ${result.successCount}, 실패: ${result.failCount}, 잔여: ${result.remaining}`);
 
     if (result.remaining > 0) {
       console.log(`아직 ${result.remaining}건 남음. phase2_summarizeAndEmail()을 다시 실행하세요.`);
@@ -84,7 +84,25 @@ function fetchSummarizeAndSendByEmail() {
     const result1 = phase1_fetchAndScore();
     if (result1 !== "Phase 1 완료") return result1;
 
-    return phase2_summarizeAndEmail();
+    // 배치 반복: 잔여 건이 0이 될 때까지 요약 반복 후 이메일 발송
+    const spreadsheet = getLastSpreadsheet();
+    if (!spreadsheet) return "스프레드시트 없음";
+
+    let remaining = Infinity;
+    while (remaining > 0) {
+      const result = summarizePubMedArticlesWithGemini(spreadsheet);
+      remaining = result.remaining;
+      console.log(`배치 완료 — 성공: ${result.successCount}, 잔여: ${remaining}`);
+    }
+
+    console.log("모든 요약 완료. 이메일 전송 시작...");
+    const mailResult = sendSummariesToEmail(spreadsheet);
+    if (mailResult && mailResult.ok) {
+      console.log("이메일 전송 완료: " + mailResult.subject);
+    } else {
+      console.log("이메일 전송 결과: " + mailResult);
+    }
+    return mailResult;
   } catch (error) {
     console.error("워크플로우 실행 오류:", error);
     return "오류: " + error.message;
@@ -108,7 +126,7 @@ function sendNoResultsEmail(message) {
   emailBody += `<p style="color: #0C4A6E;">지난 주 새로 출간된 논문은 검색되지 않았습니다.<br>`;
   emailBody += `평안한 한 주 보내시기 바랍니다.</p>`;
   emailBody += `<hr style="margin: 20px 0; border-color: #BFDBFE;">`;
-  emailBody += `<p style="color: #0369A1; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
+  emailBody += `<p style="color: #0369A1; font-size: 12px;">이 이메일은 Gemini에 의해 자동으로 생성되었습니다.</p>`;
   emailBody += `</div>`;
 
   const plainText = emailBody

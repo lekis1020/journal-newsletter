@@ -8,7 +8,7 @@ function formatKoreanDate(date) {
 
 /**
  * 요약 텍스트를 줄 단위로 분리
- * @param {string} summary - GPT 요약 텍스트
+ * @param {string} summary - Gemini 요약 텍스트
  * @return {string[]} 줄 배열
  */
 function buildPaperSummaryLines(summary) {
@@ -20,7 +20,7 @@ function buildPaperSummaryLines(summary) {
 
 /**
  * 요약 줄을 이메일용 HTML div로 변환
- * @param {string} summary - GPT 요약 텍스트
+ * @param {string} summary - Gemini 요약 텍스트
  * @return {string} HTML 문자열
  */
 function formatSummaryForEmail(summary) {
@@ -191,7 +191,7 @@ function sendSummariesToEmail(spreadsheet) {
     emailBody += '<p style="font-size: 16px; color: #0C4A6E;"> <br> 최근 7일(전자출판기준) 발표된 호흡기 알레르기 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
     emailBody += '<p style="color: #0C4A6E;"> 다음 MeSH Term 을 가진 논문들을 검색합니다. <br> Asthma, Rhinitis, Rhinitis allergic, Sinusitis, Nasal polyps, Bronchial hyperreactivity, Aspirin-exacerbated respiratory disease, Cough, Respiratory hypersensitivity </p>';
     emailBody += '<p style="color: #0C4A6E;"> 다음 저널에서 검색합니다. <br> J Allergy Clin Immunol, J Allergy Clin Immunol Pract, Allergy, Ann Allergy Asthma Immunol, Clin Exp Allergy, Allergol Int, World Allergy Organ J, NEJM Evid, NEJM, Chest, Lancet Respir Med, Am J Respir Crit Care Med, Eur Respir J, Thorax, Respir Res, Respir Med, J Asthma, Curr Opin Allergy Clin Immunol, J Investig Allergol Clin Immunol, Allergy Asthma Proc, Allergy Asthma Clin Immunol, Allergy Asthma Immunol Res, Allergy Asthma Respir Dis, Front Immunol </p>';
-    emailBody += `<p style="color: #0369A1; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
+    emailBody += `<p style="color: #0369A1; font-size: 12px;">이 이메일은 Gemini에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
 
     // 플레인 텍스트 버전 생성 (HTML 태그 제거)

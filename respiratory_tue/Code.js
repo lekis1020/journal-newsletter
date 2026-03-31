@@ -1,6 +1,6 @@
 /**
  * 화요일 - 호흡기 논문 위주 (천식, 비염 등)
- * PubMed 검색, 데이터 저장, GPT 요약
+ * PubMed 검색, 데이터 저장, Gemini 요약
  *
  * 설정/상수: config.js
  * 스코어링: scoring.js
@@ -15,7 +15,7 @@ function fetchAndSummarizeAll() {
   if (spreadsheet) {
     SpreadsheetApp.setActiveSpreadsheet(spreadsheet);
     scoreAndFilterPapers(spreadsheet);
-    summarizePubMedArticlesWithGPT(spreadsheet);
+    summarizePubMedArticlesWithGemini(spreadsheet);
   }
 }
 
@@ -267,37 +267,57 @@ function saveResultsToSheet(data) {
   }
 }
 
-// ===== GPT 호출 =====
+// ===== Gemini 호출 =====
 
-function callGPT(prompt) {
-  const url = "https://api.openai.com/v1/chat/completions";
+function callGemini(prompt) {
+  // Gemini OpenAI-compatible endpoint
+  const url = "https://generativelanguage.googleapis.com/v1beta/openai/v1/chat/completions";
   const payload = {
-    model: CONFIG.GPT_MODEL,
+    model: CONFIG.GEMINI_MODEL,
     messages: [{ role: "user", content: prompt }]
   };
 
   const options = {
     method: "post",
     contentType: "application/json",
-    headers: { Authorization: `Bearer ${getSecret('OPENAI_API_KEY')}` },
+    headers: { Authorization: `Bearer ${getSecret('GEMINI_API_KEY')}` },
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   };
 
-  const response = UrlFetchApp.fetch(url, options);
-  const json = JSON.parse(response.getContentText());
+  for (let attempt = 1; attempt <= CONFIG.MAX_RETRIES; attempt++) {
+    try {
+      if (attempt > 1) {
+        Utilities.sleep(CONFIG.RETRY_DELAY * Math.pow(CONFIG.RETRY_MULTIPLIER, attempt - 2));
+      }
+      
+      const res = UrlFetchApp.fetch(url, options);
+      const responseCode = res.getResponseCode();
 
-  if (json.error) {
-    throw new Error(json.error.message);
+      if (responseCode === 429) {
+        console.warn(`Gemini API 할당량 초과 (429). 재시도 중... (${attempt}/${CONFIG.MAX_RETRIES})`);
+        continue;
+      }
+
+      if (responseCode !== 200) {
+        throw new Error(JSON.parse(res.getContentText()).error?.message || `Status ${responseCode}`);
+      }
+
+      const json = JSON.parse(res.getContentText());
+      if (json.error) throw new Error(json.error.message);
+
+      return json.choices[0].message.content.trim();
+    } catch (e) {
+      console.error(`Gemini 호출 오류 (${attempt}/${CONFIG.MAX_RETRIES}):`, e.message);
+      if (attempt >= CONFIG.MAX_RETRIES) throw e;
+    }
   }
-
-  return json.choices[0].message.content.trim();
 }
 
-// ===== GPT 요약 =====
+// ===== Gemini 요약 =====
 
-function summarizePubMedArticlesWithGPT(spreadsheet) {
-  console.log("논문 GPT 요약 작업 시작...");
+function summarizePubMedArticlesWithGemini(spreadsheet) {
+  console.log("논문 Gemini 요약 작업 시작...");
 
   let sheet;
   try {
@@ -421,10 +441,11 @@ Output format:
 No hallucination
 `;
 
-      const summary = callGPT(prompt);
+      const summary = callGemini(prompt);
       sheet.getRange(rowIndex, targetCol).setValue(summary);
       successCount++;
-      Utilities.sleep(1500);
+      // 429 회피를 위한 대기 시간 대폭 증가 (6초)
+      Utilities.sleep(6000);
 
     } catch (error) {
       console.error(`PMID ${pmid} 처리 오류:`, error);

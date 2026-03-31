@@ -7,10 +7,11 @@
 
 const CONFIG = {
   OPENAI_API_KEY: '',  // Script Properties에서 가져옴
+  GEMINI_API_KEY: '',  // Script Properties에서 가져옴
   PUBMED_API_KEY: '',  // Script Properties에서 가져옴
-  GPT_MODEL: 'gpt-5-mini',
-  MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
+  GEMINI_MODEL: 'gemini-2.5-flash',
+  MAX_RETRIES: 5,
+  RETRY_DELAY: 5000,
   RETRY_MULTIPLIER: 2,
   JOURNALS: [
     "The Journal of allergy and clinical immunology",
@@ -60,8 +61,8 @@ const CONFIG = {
 const MESSAGES = {
   NO_ABSTRACT: "초록을 찾을 수 없습니다.",
   NO_PMID: "PMID를 찾을 수 없습니다.",
-  SUMMARY_HEADER: "GPT 요약",
-  COLUMN_HEADERS: ["Title", "Journal", "Year", "PMID", "Publication Type", "GPT 요약"]
+  SUMMARY_HEADER: "Gemini 요약",
+  COLUMN_HEADERS: ["Title", "Journal", "Year", "PMID", "Publication Type", "Gemini 요약"]
 };
 
 // ===== Script Properties 헬퍼 =====
