@@ -17,9 +17,13 @@ function fetchSummarizeAndSendByEmail() {
       console.log("GPT 요약 완료");
 
       console.log("이메일 전송 시작...");
-      const result = sendSummariesToEmail(spreadsheet);
-      console.log("이메일 전송 결과: " + result);
-      return result;
+      const mailResult = sendSummariesToEmail(spreadsheet);
+      if (mailResult && mailResult.ok) {
+        console.log("이메일 전송 완료: " + mailResult.subject);
+      } else {
+        console.log("이메일 전송 결과: " + mailResult);
+      }
+      return mailResult;
     } else {
       const message = "금주 검색 대상 논문이 없습니다.";
       console.warn(message);
@@ -44,10 +48,6 @@ function sendNoResultsEmail(message) {
   const startDate = new Date(today);
   startDate.setDate(today.getDate() - CONFIG.DAYS_RANGE);
 
-  function formatKoreanDate(date) {
-    return `${date.getMonth() + 1}월 ${date.getDate()}일`;  
-  }
-  
   const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
   Logger.log(searchPeriod); 
 
