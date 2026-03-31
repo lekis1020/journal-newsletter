@@ -1,5 +1,7 @@
 **/**
 !appsscript.json
 !Code.js
+!config.js
+!scoring.js
 !email.js
 !total.js
