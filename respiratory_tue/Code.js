@@ -152,9 +152,9 @@ function fetchPubMedWeeklyAndSave() {
   // 1. 검색 쿼리 준비
   const journalQuery = CONFIG.JOURNALS.map(journal => `"${journal}"[Journal]`).join(" OR ");
   const pubTypeQuery = CONFIG.PUB_TYPES.map(type => `"${type}"[Publication Type]`).join(" OR ");
-  const meshTerms = ["asthma","rhinitis","rhinitis, allergic","sinusitis","nasal polyps","bronchial hyperreactivity","eosinophilic esophagitis","aspirin-exacerbated respiratory disease","cough","respiratory hypersensitivity"];
+  const meshTerms = ["asthma","rhinitis","rhinitis, allergic","sinusitis","nasal polyps","bronchial hyperreactivity","aspirin-exacerbated respiratory disease","cough","respiratory hypersensitivity"];
   const meshQuery = meshTerms.map(term => `"${term}"[MeSH Terms]`).join(" OR ");
-  const diseaseTerms = ["asthma","rhinitis","allergic rhinitis","sinusitis","nasal polyp","chronic rhinosinusitis","eosinophilic","bronchial hyperresponsiveness","AERD","aspirin-exacerbated"];
+  const diseaseTerms = ["asthma","rhinitis","allergic rhinitis","sinusitis","nasal polyp","chronic rhinosinusitis","bronchial hyperresponsiveness","AERD"];
   const diseaseQuery = diseaseTerms.map(term => `"${term}"[Title]`).join(" OR ");
 
   // 2. 날짜 범위 설정
@@ -173,34 +173,73 @@ function fetchPubMedWeeklyAndSave() {
   const endDate = formatDate(today);
   const dateRange = `"${startDate}"[EDAT] : "${endDate}"[EDAT]`;
   
-  // 3. 최종 쿼리 생성 및 URL 인코딩
-  const finalQuery = `(${journalQuery}) AND ((${diseaseQuery}) OR (${meshQuery})) AND (${dateRange})`;
-  const encodedQuery = encodeURIComponent(finalQuery);
-  
-  // 4. PubMed API 호출
-  const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodedQuery}&retmax=${CONFIG.MAX_RESULTS}&sort=pubdate&retmode=json&api_key=${getSecret('PUBMED_API_KEY')}`;
-  console.log(url);
+  // 3. 최종 쿼리 생성
+  const keywordQuery = `(${meshQuery}) OR (${diseaseQuery})`;
+  const finalQuery = `(${journalQuery}) AND (${keywordQuery}) AND (${dateRange})`;
+
+  // 4. PubMed ESearch API (POST 방식 — URL 길이 제한 회피)
+  const esearchUrl = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi';
+
+  const params = {
+    'db': 'pubmed',
+    'term': finalQuery,
+    'retmode': 'json',
+    'retmax': CONFIG.MAX_RESULTS,
+    'usehistory': 'y',
+    'api_key': getSecret('PUBMED_API_KEY')
+  };
+
+  const payloadString = Object.keys(params)
+    .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(params[key])}`)
+    .join('&');
+
+  const options = {
+    'method': 'post',
+    'contentType': 'application/x-www-form-urlencoded',
+    'payload': payloadString,
+    'muteHttpExceptions': true
+  };
+
   try {
-    const response = UrlFetchApp.fetch(url);
-    const json = JSON.parse(response.getContentText());
-    const idList = json.esearchresult.idlist;
-    
-    // 5. 검색 결과 확인
-    if (idList.length === 0) {
-      console.log('최근 1주일간 검색된 논문이 없습니다.');
-      return null;  // 결과가 없으면 null 반환
+    const response = UrlFetchApp.fetch(esearchUrl, options);
+    const responseCode = response.getResponseCode();
+    const responseBody = response.getContentText();
+
+    if (responseCode === 200) {
+      const esearchResults = JSON.parse(responseBody);
+
+      if (esearchResults.esearchresult && esearchResults.esearchresult.ERROR) {
+        console.error('PubMed ESearch API Error:', esearchResults.esearchresult.ERROR);
+        return null;
+      }
+      if (!esearchResults.esearchresult) {
+        console.error('PubMed ESearch 응답 형식이 예상과 다릅니다.');
+        return null;
+      }
+
+      const idList = esearchResults.esearchresult.idlist || [];
+
+      if (idList.length === 0) {
+        console.log(`최근 ${CONFIG.DAYS_RANGE}일간 검색된 논문이 없습니다.`);
+        return null;
+      }
+
+      console.log(`총 ${idList.length}개의 논문 ID를 가져왔습니다.`);
+      const results = fetchPubMedData(idList);
+
+      if (!results || results.length === 0) {
+        console.error('논문 상세 정보 가져오기에 실패했거나 결과가 없습니다.');
+        return null;
+      }
+
+      return saveResultsToSheet(results);
+    } else {
+      console.error(`PubMed ESearch API 호출 실패. 응답 코드: ${responseCode}`);
+      return null;
     }
-    
-    // 6. 검색된 논문의 상세 정보 가져오기
-    console.log(`총 ${idList.length}개의 논문 ID를 가져왔습니다.`);
-    const results = fetchPubMedData(idList);
-    
-    // 7. 결과를 스프레드시트에 저장하고 스프레드시트 객체 반환 (수정된 부분)
-    return saveResultsToSheet(results);
-    
   } catch (error) {
     console.error('PubMed 검색 실패:', error);
-    return null;  // 오류 발생시 null 반환
+    return null;
   }
 }
 /**
@@ -692,6 +731,17 @@ PMID: ${pmid}
 
 위 정보를 바탕으로 아래 형식으로 **요약만 출력**해 주세요.  
 
+Output format:
+• 🗓️: [date]
+• 📒: [journal]
+• 👤: [first 3 and corr. author et al.]
+• 🎯: [disease]
+• 🔬: [study type + brief method, 2-3 lines]
+• 📊: [key results, 2-3 lines]
+• ✅: [clinical implications]
+• ⚠️: [limitations]
+• #️⃣: #disease #mechanism #keyword #drug/study_type
+
 요약 시 주의사항:
   1. **제공된 정보만 사용**하고, **없는 정보는 빈칸으로 남겨주세요 (No hallucination)**  
 	2.	의학 전문가용 뉴스레터이므로 불필요하게 쉬운 말로 풀지 말고, 핵심 용어는 그대로 사용하세요.
@@ -703,55 +753,6 @@ PMID: ${pmid}
   8. 본문에서 의미상 중요한 단어는 이메일로 출력 시 진한 글씨체로 표시될 수 있도록 "<b>" "</b>" 로 감싸서 표시해줘. 
   9. 의미상 중요한 단어로는 cytokine 이름, 연구에서 분석한 약제 이름, clinical trial 의 이름 등이 해당하고, 이러한 단어는 8번의 표시를 붙여줘. 
   10. 핵심 결과 요약 영역에서 가장 중요한 내용은 "<u>"  "</u>" 로 감싸서 표시해줘.
-
-No hallucination
-
-출력 형식은 아래와 같습니다: (영문 원문 기준 요약 후, 한국어로 정리):
-
-  
-  • 🗓️: [일시]  
-  • 📒: [출판사 이름]
-  • 👤: [제1,2,3 저자 및 교신저자 et al.]
-  • 주요 대상 질환: [논문에서 주로 다루는 질환명]
-  • 연구 방법: [연구 디자인 또는 리뷰라면 주요 논의점 요약 (2~3줄)] 
-  • 🎯: [핵심 결과 요약. 임상적으로 중요한 정보 포함 (2~3줄)] 
-  • 임상적용 가능성: [해당 연구가 임상 진료에 미칠 수 있는 영향. 가능하면 구체적으로]
-  • 제한점: [해당 연구의 한계 또는 아직 밝혀지지 않은 점]  
-  • Tag: #[질환] #[기전/중요한 키워드1] #[기전/중요한 키워드2] #[약물명 또는 연구종류 등]
-
-다음은 출력 예시입니다. 
-
-• 🗓️: Tue Apr 01 2025
-• 📒: Allergy
-• 👤: Domingo C, Busse WW, Hanania NA, et al.
-• 주요 대상 질환: Allergic Asthma
-• 연구 방법: 이 리뷰 연구에서는 IgE의 <b>기도 상피세포</b>에 대한 직접적이고 간접적인 역할에 대해 논의하였으며, 알레르기성 천식 질환에 초점을 맞추었습니다.
-• 🎯: IgE는 알레르기성 기도 질환에서 핵심 분자로, T2 inflammation 및 <b>기도 상피 내 리모델링</b> 과정에서 중요한 역할을 합니다. IgE와 기도 상피 간 복잡한 상호작용 네트워크에 대한 더 깊은 이해는 천식 병리생리학에 대한 이해를 향상시킬 것입니다.
-• 임상적용 가능성: IgE를 차단하는 omalizumab은 알레르기성 천식 치료에 효과적인 것으로 나타났습니다.
-• 제한점: IgE의 기도 상피세포에 대한 역할은 덜 알려져 있습니다.
-• Tag: #AllergicAsthma #AirwayEpithelium #IgE
-
-
-• 🗓️: Tue Apr 01 2025 
-• 📒: The Journal of Allergy and Clinical Immunology
-• 👤: Akenroye A, Boyce JA, Kita H
-• 주요 대상 질환: Asthma
-• 연구 방법: Allergy와 2형(T2) 중재 기도염증의 메커니즘 연구를 통해 천식 치료를 위한 다양한 항체 치료법을 개발하고, 특히 <b>alarmin</b>과 그들의 수용체를 대상으로 한 치료법에 대해 검토하였습니다.
-• 🎯: <b>Alarmins</b>과 그들의 수용체를 대상으로 한 치료법은 <b>T2-high 및 T2-low asthma</b> 치료에 효과적일 수 있으며, 이미 <b>tezepelumab</b>이라는 alarmins 대상 항체가 severe asthma 치료를 위해 승인 받았습니다.
-• 임상적용 가능성: Alarmins과 그들의 수용체를 대상으로 한 치료법은 asthma의 정밀 의학 분야에서 새로운 전선을 열 수 있습니다.
-• 제한점: 아직 많은 T2-high 천식 환자들이 IgE- 또는 T2 사이토카인 대상 치료에 반응하지 않고, T2-low 천식 환자들에게는 치료 옵션이 적다는 점입니다.
-• Tag: #asthma #alarmin #precisonal_treatment #tezepelumab
-
-
-• 🗓️: Tue Apr 01 2025 
-• 📒: The Journal of Allergy and Clinical Immunology
-• 👤: Meledathu S, Naidu MP, Brunner PM
-• 주요 대상 질환: Atopic dermatitis
-• 연구 방법: 분자 endotype, 임상적 phenotype, 피부 <b>microbiome</b>, 진단 도구 및 치료법 발전에 관한 최신 연구 문헌을 종합적으로 검토한 리뷰 논문
-• 🎯: <b>아토피 피부염</b>의 <b>병태생리학적 기전</b>에 대한 이해가 크게 향상되었으며, 이를 바탕으로 새로운 표적 치료법이 개발되어 치료 옵션이 혁신적으로 발전함
-• 임상적용 가능성: 새로운 분자적 이해를 바탕으로 개발된 표적 치료법은 기존의 치료에 반응하지 않는 중증 아토피 피부염 환자들에게 새로운 치료 대안을 제공할 수 있음
-• 제한점: 초록에서는 구체적인 제한점을 언급하지 않았으나, 새로운 치료법의 장기적 안전성과 효과에 대한 추가 연구가 필요할 수 있음
-• Tag: #AtopicDermatitis #SkinMicrobiome #TargetedTreatment
 
 No hallucination
 `;
