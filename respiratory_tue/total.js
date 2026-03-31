@@ -53,11 +53,16 @@ function phase2_summarizeAndEmail() {
 
     console.log("스프레드시트: " + spreadsheet.getName());
 
-    console.log("GPT 요약 시작 (Included=O 만)...");
-    summarizePubMedArticlesWithGPT(spreadsheet);
-    console.log("GPT 요약 완료");
+    console.log(`GPT 요약 시작 (배치 ${CONFIG.SUMMARY_BATCH_SIZE}건, Included=O 만)...`);
+    const result = summarizePubMedArticlesWithGPT(spreadsheet);
+    console.log(`GPT 요약 완료 — 성공: ${result.successCount}, 실패: ${result.failCount}, 잔여: ${result.remaining}`);
 
-    console.log("이메일 전송 시작...");
+    if (result.remaining > 0) {
+      console.log(`아직 ${result.remaining}건 남음. phase2_summarizeAndEmail()을 다시 실행하세요.`);
+      return `요약 진행 중 — 잔여 ${result.remaining}건`;
+    }
+
+    console.log("모든 요약 완료. 이메일 전송 시작...");
     const mailResult = sendSummariesToEmail(spreadsheet);
     if (mailResult && mailResult.ok) {
       console.log("이메일 전송 완료: " + mailResult.subject);

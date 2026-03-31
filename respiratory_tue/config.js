@@ -52,6 +52,7 @@ const CONFIG = {
   EMAIL_RECIPIENTS: '',
   EMAIL_TO_PRIMARY: '',
   EMAIL_SUBJECT_PREFIX: '[Ajou Allergy Journal Letter]',
+  SUMMARY_BATCH_SIZE: 10,              // 한 번 실행에 요약할 최대 논문 수
   EMAIL_BATCH_SIZE: 15,
   EMAIL_MAX_LENGTH: 100000
 };

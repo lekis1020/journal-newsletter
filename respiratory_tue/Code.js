@@ -335,6 +335,7 @@ function summarizePubMedArticlesWithGPT(spreadsheet) {
   let successCount = 0;
   let failCount = 0;
   let skipCount = 0;
+  const batchLimit = CONFIG.SUMMARY_BATCH_SIZE || 10;
   const startTime = new Date().getTime();
 
   for (let i = 0; i < dataRows.length; i++) {
@@ -347,6 +348,12 @@ function summarizePubMedArticlesWithGPT(spreadsheet) {
     if (existingSummary && !existingSummary.startsWith("오류:")) {
       skipCount++;
       continue;
+    }
+
+    // 배치 크기 도달 시 중단
+    if (successCount + failCount >= batchLimit) {
+      console.log(`배치 제한 도달 (${batchLimit}건). 나머지는 다음 실행에서 처리합니다.`);
+      break;
     }
 
     const rowIndex = i + 2;
@@ -437,7 +444,16 @@ No hallucination
 
   try { SpreadsheetApp.flush(); } catch (flushErr) { console.error("마지막 flush 오류:", flushErr); }
 
-  const resultMsg = `요약 작업 완료! 성공: ${successCount}, 실패: ${failCount}, 기존 스킵: ${skipCount}`;
+  // 잔여 건수 계산: Included=O이면서 아직 요약이 없는 행
+  const freshData = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+  let remaining = 0;
+  for (let j = 0; j < freshData.length; j++) {
+    if (!shouldSummarizeRow(freshData[j][includedIdx], includedIdx !== -1)) continue;
+    const s = String(freshData[j][summaryIdx] || "").trim();
+    if (!s || s.startsWith("오류:")) remaining++;
+  }
+
+  const resultMsg = `요약 작업 완료! 성공: ${successCount}, 실패: ${failCount}, 기존 스킵: ${skipCount}, 잔여: ${remaining}`;
   console.log(resultMsg);
-  return resultMsg;
+  return { successCount, failCount, skipCount, remaining };
 }
