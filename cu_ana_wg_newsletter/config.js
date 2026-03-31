@@ -40,7 +40,7 @@ const BUSINESS_CONFIG = {
   // 점수 설정
   MIN_RELEVANCE_SCORE: 3,           // 최소 관련성 점수
   MAX_INCLUSION: 15,                // 최대 포함 논문 수 (Top N)
-  SCORING_MODE: 'gpt',              // 'regex' | 'gpt' (기본: LLM 기반 점수 평가)
+  SCORING_MODE: 'regex',             // 'regex' | 'gpt' (기본: 정규식 기반 점수 평가)
   COMPARE_WITH_GPT_SCORING: false,  // true면 시트에 GPT 비교 점수 컬럼 추가
 
   // 이메일 설정
