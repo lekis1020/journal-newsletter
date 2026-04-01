@@ -121,7 +121,7 @@ function sendSummariesToEmail(spreadsheet) {
     const searchPeriod = `${formatKoreanDate(startDate)}부터 ${formatKoreanDate(today)}까지`;
     Logger.log(searchPeriod);
 
-    const subject = `[CU-Ana Newsletter] ${searchPeriod} 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 - 총 ${filteredData.length}개 논문`;
+    const subject = `[CU-Ana Newsletter] ${searchPeriod}, 총 ${filteredData.length}개 논문`;
 
     let emailBody = `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', sans-serif;">`;
     emailBody += `
@@ -129,7 +129,7 @@ function sendSummariesToEmail(spreadsheet) {
       font-size: 22px;
       font-weight: 700;
       margin-bottom: 16px;
-      color: #7F1D1D;
+      color: #0F172A;
     ">
       최근 ${CONFIG.DAYS_RANGE}일 간 (${searchPeriod}) 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 논문 요약</h4>`;
     emailBody += `
@@ -137,7 +137,7 @@ function sendSummariesToEmail(spreadsheet) {
       font-size: 16px;
       font-weight: 600;
       margin: 8px 0 18px 0;
-      color: #7F1D1D;
+      color: #0F172A;
     ">
       총 ${data.length}개 검색 중 상위 ${filteredData.length}개의 논문 요약을 공유합니다.</p>`;
     emailBody += `<hr style="margin: 20px 0; border-color: #CBD5E1;">`;
@@ -155,27 +155,28 @@ function sendSummariesToEmail(spreadsheet) {
       const pubmedLink = `https://pubmed.ncbi.nlm.nih.gov/${pmid}/`;
 
       // 논문 카드
+      const paperNum = i + 1;
       emailBody += `<div style="margin-bottom: 30px; border: 1px solid #CBD5E1; padding: 15px; border-radius: 5px; background-color: #FFFFFF;">`;
-      // 제목 헤더
-      emailBody += `<div style="border-bottom: 2px solid #DC2626; padding-bottom: 10px; margin-bottom: 10px;">`;
-      emailBody += `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; color: #1E293B; margin-bottom: 10px;">📔: ${title}</div>`;
+      // 제목 헤더 (넘버링 포함)
+      emailBody += `<div style="border-bottom: 2px solid #334155; padding-bottom: 10px; margin-bottom: 10px;">`;
+      emailBody += `<div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 18px; font-weight: bold; color: #1E293B; margin-bottom: 10px;">[${paperNum}/${filteredData.length}] 📔: ${title}</div>`;
       emailBody += `</div>`;
 
       // 요약 내용
-      emailBody += `<div style="font-size: 16px; line-height: 1.7; color: #7F1D1D; background-color: #F8FAFC; padding: 12px 14px; border-left: 4px solid #DC2626;">`;
+      emailBody += `<div style="font-size: 16px; line-height: 1.7; color: #0F172A; background-color: #F8FAFC; padding: 12px 14px; border-left: 4px solid #334155;">`;
       emailBody += formatSummaryForEmail(summary);
       emailBody += `</div>`;
 
       // 링크
-      emailBody += `<div style="margin-top: 10px; font-size: 14px; color: #7F1D1D;">`;
-      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank" style="color: #DC2626;">${pubmedLink}</a>`;
+      emailBody += `<div style="margin-top: 10px; font-size: 14px; color: #0F172A;">`;
+      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank" style="color: #334155;">${pubmedLink}</a>`;
       emailBody += `</div>`;
       emailBody += `</div>`;
     }
 
     emailBody += `<hr style="margin: 20px 0; border-color: #CBD5E1;">`;
-    emailBody += '<p style="font-size: 16px; color: #7F1D1D;"> <br> 최근 7일(전자출판기준) 발표된 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
-    emailBody += `<p style="color: #DC2626; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
+    emailBody += '<p style="font-size: 16px; color: #0F172A;"> <br> 최근 7일(전자출판기준) 발표된 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
+    emailBody += `<p style="color: #334155; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
 
     const plainText = emailBody
