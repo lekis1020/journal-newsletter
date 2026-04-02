@@ -84,6 +84,14 @@ function getSecret(key, fallback) {
   return value || fallback || '';
 }
 
+function formatPaperDateValue(dateValue, utilitiesRef) {
+  if (!dateValue) return "";
+  if (dateValue instanceof Date) {
+    return utilitiesRef.formatDate(dateValue, "GMT+9", "yyyy년 MM월 dd일");
+  }
+  return String(dateValue);
+}
+
 // ===== 2. 메인 실행 함수 =====
 
 /**
@@ -583,7 +591,7 @@ for (let i = 0; i < dataRows.length; i++) {
     if (!abstract) {
       console.log(`행 ${rowIndex}: 초록이 없어서 스킵`);
       //sheet.getRange(rowIndex, targetCol).setValue(MESSAGES.NO_ABSTRACT);
-      const formattedDate = Utilities.formatDate(date, "GMT+9", "yyyy년 MM월 dd일");
+      const formattedDate = formatPaperDateValue(date, Utilities);
       const message = `초록이 없습니다.\n 📅: ${formattedDate} \n 📒: ${journal}\n👥: ${authors}`;
       sheet.getRange(rowIndex, targetCol).setValue(message);
       
