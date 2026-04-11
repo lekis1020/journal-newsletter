@@ -36,49 +36,6 @@ function getTodayISO() {
 // ===== 텍스트 처리 함수 =====
 
 /**
- * Notion 텍스트를 지정된 길이로 자르기
- * @param {string} s - 원본 문자열
- * @param {number} maxLen - 최대 길이
- * @return {string} 잘린 문자열
- */
-function clampNotionText(s, maxLen) {
-  const str = String(s || "");
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 1) + "…";
-}
-
-/**
- * 텍스트를 Notion rich_text 청크로 변환
- * @param {string} text - 변환할 텍스트
- * @param {number} chunkSize - 청크 크기 (기본값: 1900)
- * @return {Array} Notion rich_text 배열
- */
-function toNotionRichTextChunks(text, chunkSize) {
-  chunkSize = chunkSize || 1900;
-  const s = String(text || "");
-  const chunks = [];
-
-  for (let i = 0; i < s.length; i += chunkSize) {
-    chunks.push({ text: { content: s.slice(i, i + chunkSize) } });
-  }
-
-  // Notion API Limit: rich_text array max 100 items
-  if (chunks.length > 100) {
-    console.warn(`Text too long (${chunks.length} chunks), truncating to 100.`);
-    const truncated = chunks.slice(0, 100);
-    const last = truncated[99];
-    if (last.text.content.length > (chunkSize - 20)) {
-      last.text.content = last.text.content.slice(0, chunkSize - 20) + "...(truncated)";
-    } else {
-      last.text.content += "...(truncated)";
-    }
-    return truncated;
-  }
-
-  return chunks.length ? chunks : [{ text: { content: "" } }];
-}
-
-/**
  * 마크다운 볼드 표시를 HTML로 변환
  * @param {string} text - 변환할 텍스트
  * @return {string} 변환된 텍스트
@@ -96,19 +53,6 @@ function normalizeBoldMarkup(text) {
  */
 function cleanMarkdownFromJson(jsonStr) {
   return jsonStr.replace(/```json/g, "").replace(/```/g, "").trim();
-}
-
-// ===== Notion API 관련 함수 =====
-
-/**
- * Notion API 요청 헤더 생성
- * @return {Object} Notion API 헤더 객체
- */
-function getNotionHeaders() {
-  return {
-    Authorization: `Bearer ${CONFIG.NOTION_API_KEY}`,
-    "Notion-Version": "2022-06-28"
-  };
 }
 
 // ===== 배열/데이터 처리 함수 =====

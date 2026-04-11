@@ -8,9 +8,6 @@
  *    - OPENAI_API_KEY_SCORING
  *    - OPENAI_API_KEY_SUMMARY
  *    - PUBMED_API_KEY
- *    - NOTION_API_KEY
- *    - NOTION_PAPERS_DB_ID
- *    - NOTION_NEWSLETTER_DB_ID
  *    - EMAIL_RECIPIENTS
  *    - EMAIL_TO_PRIMARY
  */
@@ -23,9 +20,6 @@ function getSecretConfig() {
     OPENAI_API_KEY_SCORING: props.getProperty('OPENAI_API_KEY_SCORING') || '',
     OPENAI_API_KEY_SUMMARY: props.getProperty('OPENAI_API_KEY_SUMMARY') || '',
     PUBMED_API_KEY: props.getProperty('PUBMED_API_KEY') || '',
-    NOTION_API_KEY: props.getProperty('NOTION_API_KEY') || '',
-    NOTION_PAPERS_DB_ID: props.getProperty('NOTION_PAPERS_DB_ID') || '',
-    NOTION_NEWSLETTER_DB_ID: props.getProperty('NOTION_NEWSLETTER_DB_ID') || '',
     EMAIL_RECIPIENTS: props.getProperty('EMAIL_RECIPIENTS') || '',
     EMAIL_TO_PRIMARY: props.getProperty('EMAIL_TO_PRIMARY') || ''
   };
@@ -99,6 +93,27 @@ const JOURNALS = [
   "Curr Opin Allergy Clin Immunol",
   "International archives of allergy and immunology",
   "Int Arch Allergy Immunol",
+  "The journal of allergy and clinical immunology. Global",
+  "J Allergy Clin Immunol Glob",
+  "Clinical reviews in allergy & immunology",
+  "Clin Rev Allerg Immunol",
+  "Immunology letters",
+  "Immunol Lett",
+
+  // === Complement & Immunology ===
+  "Complement",
+  "Molecular immunology",
+  "Mol Immunol",
+  "The Journal of immunology",
+  "J Immunol",
+  "Clinical immunology",
+  "Clin Immunol",
+  "European journal of immunology",
+  "Eur J Immunol",
+
+  // === Hematology / Mast Cell ===
+  "Blood",
+  "Haematologica",
 
   // === Dermatology ===
   "Journal of the American Academy of Dermatology",
@@ -117,6 +132,10 @@ const JOURNALS = [
   "Journal of dermatological science",
   "J Dermatol Sci",
   "Dermatology",
+  "Experimental dermatology",
+  "Exp Dermatol",
+  "International journal of dermatology",
+  "Int J Dermatol",
 
   // === General Medical ===
   "The New England journal of medicine",
@@ -124,8 +143,26 @@ const JOURNALS = [
   "NEJM evidence",
   "NEJM Evid",
   "The Lancet",
+  "The Lancet. Respiratory medicine",
+  "Lancet Respir Med",
+  "The Lancet. Child & adolescent health",
+  "Lancet Child Adolesc Health",
+  "The Lancet. Haematology",
+  "Lancet Haematol",
   "JAMA",
-  "BMJ"
+  "JAMA network open",
+  "JAMA Netw Open",
+  "BMJ",
+  "Annals of internal medicine",
+  "Ann Intern Med",
+  "Nature medicine",
+  "Nat Med",
+  "Nature reviews. Immunology",
+  "Nat Rev Immunol",
+  "Nature immunology",
+  "Nat Immunol",
+  "The Journal of clinical investigation",
+  "J Clin Invest"
 ];
 
 // ===== 출판 유형 =====

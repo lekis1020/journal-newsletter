@@ -188,7 +188,6 @@ function scoreAndFilterPapers(spreadsheet) {
 
 function emptyRelevanceFlags() {
   return {
-    hasCancerInTitle: false, hasCancerInAbstract: false,
     hasUrticariaInTitle: false, hasUrticariaInAbstract: false,
     hasAnaphylaxisInTitle: false, hasAnaphylaxisInAbstract: false,
     hasMastocytosisInTitle: false, hasMastocytosisInAbstract: false
@@ -200,11 +199,6 @@ function evaluatePaperRelevanceRegex(title, abstract) {
   const abstractText = String(abstract || "").toLowerCase();
 
   const patterns = {
-    cancer: [
-      /\bcancers?\b/i, /\bcarcinoma\w*\b/i, /\btumou?r\w*\b/i, /\bmalignan\w*\b/i,
-      /\bneoplas\w*\b/i, /\bmetasta\w*\b/i, /\boncolog\w*\b/i, /\blymphoma\w*\b/i,
-      /\bleukemia\w*\b/i, /\bsarcoma\w*\b/i, /\bmelanoma\w*\b/i
-    ],
     urticaria: [
       /\burticaria\b/i, /\bchronic\s+(spontaneous\s+)?urticaria\b/i, /\bcsu\b/i,
       /\bcindu\b/i, /\bangioedema\b/i, /\bhereditary\s+angioedema\b/i,
@@ -224,8 +218,6 @@ function evaluatePaperRelevanceRegex(title, abstract) {
   const hasMatch = (text, regs) => regs.some((r) => r.test(text));
 
   return {
-    hasCancerInTitle: hasMatch(titleText, patterns.cancer),
-    hasCancerInAbstract: hasMatch(abstractText, patterns.cancer),
     hasUrticariaInTitle: hasMatch(titleText, patterns.urticaria),
     hasUrticariaInAbstract: hasMatch(abstractText, patterns.urticaria),
     hasAnaphylaxisInTitle: hasMatch(titleText, patterns.anaphylaxis),
@@ -243,15 +235,12 @@ Title: "${title}"
 Abstract: "${abstract}"
 
 Categories:
-1. CANCER: cancer, carcinoma, tumor, malignancy, neoplasm, metastasis, oncology, lymphoma, leukemia, sarcoma, melanoma
-2. URTICARIA_ANGIOEDEMA: urticaria, chronic urticaria, CSU, CIndU, angioedema, hereditary angioedema, HAE, bradykinin
-3. ANAPHYLAXIS_FOODALLERGY: anaphylaxis, anaphylactic, food allergy, food hypersensitivity, oral immunotherapy, OIT, FPIES
-4. MASTOCYTOSIS: mastocytosis, mast cell, systemic mastocytosis, cutaneous mastocytosis, MCAS, mast cell activation
+1. URTICARIA_ANGIOEDEMA: urticaria, chronic urticaria, CSU, CIndU, angioedema, hereditary angioedema, HAE, bradykinin
+2. ANAPHYLAXIS_FOODALLERGY: anaphylaxis, anaphylactic, food allergy, food hypersensitivity, oral immunotherapy, OIT, FPIES
+3. MASTOCYTOSIS: mastocytosis, mast cell, systemic mastocytosis, cutaneous mastocytosis, MCAS, mast cell activation
 
 Return JSON:
 {
-  "hasCancerInTitle": bool,
-  "hasCancerInAbstract": bool,
   "hasUrticariaInTitle": bool,
   "hasUrticariaInAbstract": bool,
   "hasAnaphylaxisInTitle": bool,
@@ -276,8 +265,6 @@ Return JSON:
     const parsed = JSON.parse(cleanStr);
     console.log("DEBUG Parsed Flags:", JSON.stringify(parsed));
     return {
-      hasCancerInTitle: !!parsed.hasCancerInTitle,
-      hasCancerInAbstract: !!parsed.hasCancerInAbstract,
       hasUrticariaInTitle: !!parsed.hasUrticariaInTitle,
       hasUrticariaInAbstract: !!parsed.hasUrticariaInAbstract,
       hasAnaphylaxisInTitle: !!parsed.hasAnaphylaxisInTitle,
@@ -392,7 +379,7 @@ function calculateScore(flags, journalName, title, publicationType) {
     if (flags.hasMastocytosisInAbstract) mastocytosisScore += 2;
   }
 
-  // Final Calculation: 각 주제별 점수 중 최고점 + cancer 감점
+  // Final Calculation: 각 주제별 점수 중 최고점
   const baseScore = Math.max(urticariaScore, anaphylaxisScore, mastocytosisScore);
   const journalScore = scoreJournalRelevance(journalName);
   const publication = scorePublicationQuality(title, publicationType);
@@ -411,259 +398,6 @@ function calculateScore(flags, journalName, title, publicationType) {
       publicationSignal: publication.signal
     }
   };
-}
-
-function syncSheetToNotionPapersDB(spreadsheet, opts) {
-  opts = opts || {};
-  const includeSummary = !!opts.includeSummary;
-
-  const sheet = spreadsheet.getSheetByName("journal_cu_ana_db");
-  const values = sheet.getDataRange().getValues();
-  const headers = values.shift();
-
-  const norm = (s) => String(s || "").trim().toLowerCase();
-  const findIdx = (candidates) => {
-    const cand = candidates.map(norm).filter(Boolean);
-    for (let i = 0; i < headers.length; i++) {
-      if (cand.includes(norm(headers[i]))) return i;
-    }
-    return -1;
-  };
-
-  const titleIdx    = findIdx(["Title"]);
-  const journalIdx  = findIdx(["Journal"]);
-  const dateIdx     = findIdx(["Date"]);
-  const authorsIdx  = findIdx(["Authors"]);
-  const pmidIdx     = findIdx(["PMID"]);
-  const pubTypeIdx  = findIdx(["Publication Type"]);
-  const abstractIdx = findIdx(["Abstract"]);
-
-  // Summary 헤더는 유연하게 탐색
-  const summaryIdx = findIdx([
-    "Summary",
-    "GPT Summary",
-    "GPT 요약",
-    "요약",
-    "요약 결과",
-    "AI Summary",
-    (typeof MESSAGES !== "undefined" && MESSAGES.SUMMARY_HEADER) ? MESSAGES.SUMMARY_HEADER : ""
-  ]);
-
-  if (titleIdx === -1 || pmidIdx === -1) {
-    throw new Error("Sheet headers missing: Title/PMID");
-  }
-
-  for (const row of values) {
-    const pmid = row[pmidIdx];
-    if (!pmid) continue;
-
-    const paper = {
-      pmid: String(pmid),
-      title: row[titleIdx],
-      journal: journalIdx !== -1 ? row[journalIdx] : "",
-      date: dateIdx !== -1 ? row[dateIdx] : "",
-      authors: authorsIdx !== -1 ? row[authorsIdx] : "",
-      pubType: pubTypeIdx !== -1 ? row[pubTypeIdx] : "",
-      abstract: abstractIdx !== -1 ? row[abstractIdx] : "",
-      summary: (includeSummary && summaryIdx !== -1) ? row[summaryIdx] : ""
-    };
-
-  // includeSummary=true인데 summary가 비어 있으면 굳이 업데이트 안 하도록
-    if (includeSummary && !paper.summary) continue;
-
-    // 점수 기반 필터링 (Optional)
-    if (opts.filterHighScoresOnly) {
-       // Sheet에 있는 Included 컬럼 값을 확인해야 하는데, 
-       // 현재 values는 초기 읽어온 값이라 업데이트된 점수 컬럼이 없을 수 있음.
-       // 따라서, summarizePubMedArticlesWithGPT 이후에 이 함수를 호출할 때는
-       // 시트를 다시 읽거나 인자를 통해 제어해야 함.
-       // 이번 구현에서는 summarizePubMedArticlesWithGPT가 "Included"가 아닌 행엔 요약을 안 남기는 방식 등을 권장.
-       
-       // 간단히: summary가 있는 것만 보낸다면, summarize 함수에서 Included 인 것만 요약하면 됨.
-       if (!paper.summary || paper.summary.startsWith("오류") || paper.summary === "") continue;
-    }
-
-    upsertPaperToNotion(paper, { includeSummary });
-    Utilities.sleep(350);
-  }
-
-  console.log(`Notion papers sync done (includeSummary=${includeSummary})`);
-}
-
-function upsertPaperToNotion(paper, opts) {
-  opts = opts || {};
-  const includeSummary = !!opts.includeSummary;
-
-  const existingId = findPaperPageIdByPMID(paper.pmid);
-
-  const props = {
-    "Title": { title: [{ text: { content: String(paper.title || "제목 없음") } }] },
-    "PMID": { rich_text: [{ text: { content: String(paper.pmid) } }] },
-    "Journal": { rich_text: [{ text: { content: String(paper.journal || "") } }] },
-    "PubMed Link": { url: `https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/` }
-  };
-
-  // (있을 때만) Authors
-  if (paper.authors) {
-    props["Authors"] = { rich_text: [{ text: { content: String(paper.authors) } }] };
-  }
-
-  // ✅ Abstract: 최대 보존
-  if (paper.abstract !== undefined) {
-    props["Abstract"] = { rich_text: toNotionRichTextChunks(paper.abstract, 1900) };
-  }
-
-  // PubType
-  if (paper.pubType) {
-    props["Publication Type"] = {
-      multi_select: String(paper.pubType)
-        .split(",")
-        .map(t => ({ name: t.trim() }))
-        .filter(x => x.name)
-    };
-  }
-
-  // Date
-  if (paper.date instanceof Date) {
-    props["Date"] = { date: { start: Utilities.formatDate(paper.date, "GMT+9", "yyyy-MM-dd") } };
-  } else if (/^\d{4}-\d{2}-\d{2}$/.test(String(paper.date))) {
-    props["Date"] = { date: { start: String(paper.date) } };
-  }
-
-  // Digest Date (DB에 있는 경우에만 쓰세요)
-  // props["Digest Date"] = { date: { start: getTodayISO() } };
-
-  // ✅ Summary: 잘라서 저장
-  if (includeSummary) {
-    props["Summary"] = {
-      rich_text: [{ text: { content: clampNotionText(paper.summary, 2000) } }]
-    };
-  }
-
-  if (existingId) {
-    return notionUpdatePage(existingId, props);
-  }
-  return notionCreatePage(CONFIG.NOTION_PAPERS_DB_ID, props);
-}
-
-function findPaperPageIdByPMID(pmid) {
-  const url = `https://api.notion.com/v1/databases/${CONFIG.NOTION_PAPERS_DB_ID}/query`;
-
-  const payload = {
-    page_size: 1,
-    filter: {
-      property: "PMID",
-      rich_text: { equals: String(pmid) }
-    }
-  };
-
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    headers: getNotionHeaders(),
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  const res = UrlFetchApp.fetch(url, options);
-  const code = res.getResponseCode();
-  const body = res.getContentText();
-
-  if (code !== 200) {
-    throw new Error("Notion query failed: " + body);
-  }
-
-  const json = JSON.parse(body);
-  return (json.results && json.results.length > 0) ? json.results[0].id : null;
-}
-
-function notionCreatePage(databaseId, props) {
-  const url = "https://api.notion.com/v1/pages";
-
-  const payload = {
-    parent: { database_id: databaseId },
-    properties: props
-  };
-
-  const options = {
-    method: "post",
-    contentType: "application/json",
-    headers: getNotionHeaders(),
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  const res = UrlFetchApp.fetch(url, options);
-  const code = res.getResponseCode();
-  const body = res.getContentText();
-
-  if (code !== 200) {
-    throw new Error("Notion create failed: " + body);
-  }
-
-  return JSON.parse(body).id;
-}
-
-
-function notionUpdatePage(pageId, props) {
-  const url = `https://api.notion.com/v1/pages/${pageId}`;
-
-  const payload = { properties: props };
-
-  const options = {
-    method: "patch",
-    contentType: "application/json",
-    headers: getNotionHeaders(),
-    payload: JSON.stringify(payload),
-    muteHttpExceptions: true
-  };
-
-  const res = UrlFetchApp.fetch(url, options);
-  const code = res.getResponseCode();
-  const body = res.getContentText();
-
-  if (code !== 200) {
-    throw new Error("Notion update failed: " + body);
-  }
-
-  return true;
-}
-
-
-
-function upsertNewsletterToNotion(params) {
-  const dateISO = params.dateISO;          // "yyyy-MM-dd"
-  const subject = params.subject || "";
-  const htmlBody = params.htmlBody || "";
-  const spreadsheetUrl = params.spreadsheetUrl || "";
-
-  const existingId = findNewsletterPageIdByDate(dateISO);
-
-  const props = {
-    "Title": { title: [{ text: { content: `${dateISO} Newsletter` } }] },
-    "Date": { date: { start: dateISO } },
-    "Subject": { rich_text: [{ text: { content: subject } }] },
-
-    // ✅ HTML은 길어지므로 chunk 저장 (각 chunk 2000 미만 권장)
-    "Email HTML": { rich_text: toNotionRichTextChunks(htmlBody, 1900) },
-
-    "Sent At": { date: { start: new Date().toISOString() } }
-  };
-
-  if (spreadsheetUrl) props["Spreadsheet URL"] = { url: spreadsheetUrl };
-
-  if (existingId) {
-    notionUpdatePage(existingId, props);
-    return existingId;
-  } else {
-    return notionCreatePage(CONFIG.NOTION_NEWSLETTER_DB_ID, props);
-  }
-}
-
-function testNotionWrite() {
-  const today = getTodayISO();
-  const pageId = getOrCreateDailyPageId(today);
-  appendPaperToggle(pageId, "TEST TITLE", "00000000", "✅ TEST BLOCK: 노션 API 연결 성공");
 }
 
 /**
@@ -688,12 +422,6 @@ function fetchPubMedWeeklyAndSave() {
 
   const dateRangeEDAT =
     `"${formatDate(start)}"[EDAT] : "${formatDate(today)}"[EDAT]`;
-
-  /* ---------- (선택) 저널 필터 ---------- */
-  const journalQuery = (CONFIG.JOURNALS || [])
-    .map(j => `"${j}"[Journal]`)
-    .join(" OR ");
-  const journalFilter = journalQuery ? `(${journalQuery})` : null;
 
   /* ---------- MUST HAVE : 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 키워드 ---------- */
   const mustHaveBlock = `
@@ -733,7 +461,6 @@ function fetchPubMedWeeklyAndSave() {
   
   const andParts = [
     `(${dateRangeEDAT})`,
-    journalFilter, // 저널 필터 복구
     mustHaveBlock,
   ].filter(Boolean);
 
