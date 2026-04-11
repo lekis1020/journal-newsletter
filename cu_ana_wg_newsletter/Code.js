@@ -282,22 +282,51 @@ function scoreJournalRelevance(journalName) {
   const j = String(journalName || "").toLowerCase();
   if (!j) return 0;
 
-  const topTierPatterns = [
-    "journal of allergy and clinical immunology",
-    "allergy",
-    "annals of allergy",
-    "clinical and experimental allergy",
-    "world allergy organization journal",
-    "allergy asthma immunol res",
-    "allergy, asthma and immunology research",
-    "allergy, asthma and respiratory disease",
-    "aair",
-    "aard"
-  ];
+  // --- Tier 1 (IF ≥ 30, Score +3): Top general medical ---
+  if (j.includes("new england journal of medicine") || j === "n engl j med") return 3;
+  if (j === "the lancet" || j === "lancet") return 3;
+  if (j === "jama") return 3;
+  if (j === "bmj") return 3;
+  if (j.includes("nature medicine") || j === "nat med") return 3;
+  if (j.includes("nature reviews") && j.includes("immunology")) return 3;
+  if (j.includes("nat rev immunol")) return 3;
+  if (j.includes("annals of internal medicine") || j.includes("ann intern med")) return 3;
 
-  for (const p of topTierPatterns) {
-    if (j.includes(p)) return 1;
-  }
+  // --- Tier 2 (IF 10-30, Score +2): High-impact specialty ---
+  if (j.includes("lancet")) return 2;
+  if (j.includes("jama")) return 2;
+  if (j.includes("nature immunology") || j.includes("nat immunol")) return 2;
+  if (j.includes("nejm evidence") || j.includes("nejm evid")) return 2;
+  if (j === "blood") return 2;
+  if (j === "haematologica") return 2;
+  if (j.includes("journal of clinical investigation") || j.includes("j clin invest")) return 2;
+  if ((j.includes("journal of allergy and clinical immunology") || j === "j allergy clin immunol")
+      && !j.includes("practice") && !j.includes("global")) return 2;
+  if (j === "allergy") return 2;
+  if (j.includes("british journal of dermatology") || j.includes("br j dermatol")) return 2;
+  if (j.includes("american academy of dermatology") || j.includes("j am acad dermatol")) return 2;
+
+  // --- Tier 3 (IF 5-10, Score +1): Good specialty ---
+  if (j.includes("j allergy clin immunol")) return 1;
+  if (j.includes("journal of allergy and clinical immunology")) return 1;
+  if (j.includes("clinical and experimental allergy") || j.includes("clin exp allergy")) return 1;
+  if (j.includes("annals of allergy") || j.includes("ann allergy")) return 1;
+  if (j.includes("clinical reviews in allergy") || j.includes("clin rev allerg")) return 1;
+  if (j.includes("investigative dermatology") || j.includes("j invest dermatol")) return 1;
+  if (j.includes("european academy of dermatology") || j.includes("j eur acad dermatol")) return 1;
+  if (j.includes("immunological reviews")) return 1;
+  if (j.includes("frontiers in immunology")) return 1;
+  if (j.includes("world allergy organization")) return 1;
+  if (j.includes("allergology international") || j.includes("allergol int")) return 1;
+  if (j.includes("allergy, asthma and immunology research") || j.includes("allergy asthma immunol res")) return 1;
+  if (j.includes("clinical and translational allergy") || j.includes("clin transl allergy")) return 1;
+  if (j.includes("clinical and translational immunology")) return 1;
+  if (j.includes("clinical immunology") || j === "clin immunol") return 1;
+  if (j.includes("pediatric allergy") || j.includes("pediatr allergy")) return 1;
+  if (j.includes("contact dermatitis")) return 1;
+  if (j.includes("investigational allergology") || j.includes("j investig allergol")) return 1;
+
+  // Tier 4 (IF < 5, Score 0)
   return 0;
 }
 
