@@ -298,7 +298,7 @@ function scoreJournalRelevance(journalName) {
   if (j.includes("nature immunology") || j.includes("nat immunol")) return 2;
   if (j.includes("nejm evidence") || j.includes("nejm evid")) return 2;
   if (j === "blood") return 2;
-  if (j === "haematologica") return 2;
+  if (j.includes("clinical reviews in allergy") || j.includes("clin rev allerg")) return 2;
   if (j.includes("journal of clinical investigation") || j.includes("j clin invest")) return 2;
   if ((j.includes("journal of allergy and clinical immunology") || j === "j allergy clin immunol")
       && !j.includes("practice") && !j.includes("global")) return 2;
@@ -307,11 +307,11 @@ function scoreJournalRelevance(journalName) {
   if (j.includes("american academy of dermatology") || j.includes("j am acad dermatol")) return 2;
 
   // --- Tier 3 (IF 5-10, Score +1): Good specialty ---
-  if (j.includes("j allergy clin immunol")) return 1;
-  if (j.includes("journal of allergy and clinical immunology")) return 1;
+  // JACI: In Practice / JACI Global도 임상적 관련성 고려하여 +1 유지
+  if (j.includes("j allergy clin immunol") || j.includes("journal of allergy and clinical immunology")) return 1;
+  if (j === "haematologica") return 1;
   if (j.includes("clinical and experimental allergy") || j.includes("clin exp allergy")) return 1;
   if (j.includes("annals of allergy") || j.includes("ann allergy")) return 1;
-  if (j.includes("clinical reviews in allergy") || j.includes("clin rev allerg")) return 1;
   if (j.includes("investigative dermatology") || j.includes("j invest dermatol")) return 1;
   if (j.includes("european academy of dermatology") || j.includes("j eur acad dermatol")) return 1;
   if (j.includes("immunological reviews")) return 1;
