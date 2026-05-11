@@ -328,15 +328,18 @@ function scoreJournalRelevance(journalName) {
   if (j.includes("investigational allergology") || j.includes("j investig allergol")) return 1;
   if (j.includes("journal of dermatological science") || j.includes("j dermatol sci")) return 1;  // IF 4.0
 
-  // --- Tier 4 (IF < 4, Score 0): config.js JOURNALS 중 명시적 0점 처리 저널 ---
+  // --- Tier 5 (IF ≤ ~2, Score -1): 매우 낮은 IF 저널 페널티 ---
+  if (j.includes("asia pacific allergy") || j.includes("asia pac allergy")) return -1;
+  if (j.includes("international archives of allergy") || j.includes("int arch allergy")) return -1;
+  if (j.includes("acta dermato-venereologica") || j.includes("acta derm venereol")) return -1;
+
+  // --- Tier 4 (IF 2-4, Score 0): config.js JOURNALS 중 명시적 0점 처리 저널 ---
   // 아래 저널들은 검색 대상이나 IF가 낮아 점수 가산 없음 (참고용 명시):
   // - Allergy Asthma Clin Immunol, Allergy Asthma Proc, Allergy Asthma Respir Dis
-  // - Asia Pacific Allergy (IF 1.6)
   // - Curr Opin Allergy Clin Immunol (IF 2.6)
-  // - Int Arch Allergy Immunol (IF 2.1)
   // - Immunol Lett, Complement
   // - Mol Immunol (IF 3.0), J Immunol (IF 3.4), Eur J Immunol (IF 3.7)
-  // - Acta Derm Venereol (IF 2.0), Dermatology, Exp Dermatol (IF 3.2), Int J Dermatol (IF 3.3)
+  // - Dermatology, Exp Dermatol (IF 3.2), Int J Dermatol (IF 3.3)
   return 0;
 }
 
