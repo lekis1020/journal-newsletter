@@ -181,6 +181,15 @@ function sendSummariesToEmail(spreadsheet) {
     // 이메일 본문 마무리
     emailBody += `<hr style="margin: 20px 0;">`;
     emailBody += '<p stype="font-size: 16px;"> <br> 최근 7일(전자출판기준) 발표된 호산구/면역질환 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
+
+    // My Allergy 연구 포털 소개 배너
+    emailBody += `<div style="margin: 16px 0; padding: 12px 0; border-top: 1px solid #eee; color: #555; font-size: 14px; line-height: 1.6;">`;
+    emailBody += `🔬 더 많은 호산구·면역질환 논문이 궁금하다면?<br>`;
+    emailBody += `<strong>My Allergy</strong> 연구 포털에서 만나보세요 — `;
+    emailBody += `<a href="https://my-allergy.vercel.app/" target="_blank" style="color: #4285f4; text-decoration: none;">my-allergy.vercel.app</a><br>`;
+    emailBody += `<span style="color: #999; font-size: 12px;">※ 현재 베타 서비스 중입니다. 의견을 주시면 개선에 반영하겠습니다.</span>`;
+    emailBody += `</div>`;
+
     emailBody += `<p style="color: #777; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
     
