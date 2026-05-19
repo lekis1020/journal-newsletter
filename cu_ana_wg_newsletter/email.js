@@ -176,6 +176,15 @@ function sendSummariesToEmail(spreadsheet) {
 
     emailBody += `<hr style="margin: 20px 0; border-color: #CBD5E1;">`;
     emailBody += '<p style="font-size: 16px; color: #0F172A;"> <br> 최근 7일(전자출판기준) 발표된 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 관련 논문들 중 선별한 논문들에 대한 요약입니다. </p>';
+
+    // My Allergy 연구 포털 소개 배너
+    emailBody += `<div style="margin: 16px 0; padding: 12px 0; border-top: 1px solid #CBD5E1; color: #334155; font-size: 14px; line-height: 1.6;">`;
+    emailBody += `🔬 더 많은 두드러기·알레르기 논문이 궁금하다면?<br>`;
+    emailBody += `<strong>My Allergy</strong> 연구 포털에서 만나보세요 — `;
+    emailBody += `<a href="https://my-allergy.vercel.app/" target="_blank" style="color: #334155; text-decoration: underline;">my-allergy.vercel.app</a><br>`;
+    emailBody += `<span style="color: #94A3B8; font-size: 12px;">※ 현재 베타 서비스 중입니다. 의견을 주시면 개선에 반영하겠습니다.</span>`;
+    emailBody += `</div>`;
+
     emailBody += `<p style="color: #334155; font-size: 12px;">이 이메일은 GPT에 의해 자동으로 생성되었습니다.</p>`;
     emailBody += `</div>`;
 
