@@ -6,15 +6,11 @@ Google Apps Script 기반으로, 주제별 최신 논문을 자동 수집하여 
 
 ## 프로젝트 구조
 
-| 디렉토리 | 주제 | 주기 |
-|----------|------|------|
-| `cu_ana_wg_newsletter` | 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 | 주간 |
-| `cutaneous_wed` | 피부과 | 수요일 |
-| `eos_immune_wg_newsletter` | 호산구/면역 워킹그룹 | 주간 |
-| `immune_THU` | 면역 | 목요일 |
-| `meta_rct_rev_mon` | Meta-Analysis / RCT / Review | 월요일 |
-| `respiratory_tue` | 호흡기 | 화요일 |
-| `environment-newsletter` | 환경 | - |
+요일별 발송 일정과 주제는 다음과 같습니다.
+
+| 월요일 | 화요일 | 수요일 | 목요일 | 금요일 |
+|--------|--------|--------|--------|--------|
+| Meta-Analysis / RCT / Review<br>`meta_rct_rev_mon` | 호흡기<br>`respiratory_tue`<br><br>호산구/면역 워킹그룹<br>`eos_immune_wg_newsletter` | 피부과<br>`cutaneous_wed`<br><br>두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기<br>`cu_ana_wg_newsletter` | 면역<br>`immune_THU` | 환경<br>`environment-newsletter` |
 
 ## 기술 스택
 
@@ -28,6 +24,8 @@ Google Apps Script 기반으로, 주제별 최신 논문을 자동 수집하여 
 ## cu_ana_wg_newsletter
 
 CU-Ana Working Group 뉴스레터 - 두드러기/혈관부종/아나필락시스/비만세포증/식품알레르기 분야의 최신 논문을 자동 수집, 평가, 요약하여 이메일로 발송합니다.
+
+**커버 주제:** 두드러기(CSU·CIndU), 혈관부종(HAE), 아나필락시스, 비만세포증(MCAS), 식품알레르기(OIT·FPIES)
 
 ### 파일 구성
 
@@ -88,16 +86,17 @@ Regex 기반(기본) 또는 GPT 기반 키워드 탐지:
 
 두드러기/아나필락시스/비만세포증 카테고리 중 **최고점**을 사용합니다.
 
-#### B. 저널 가산점 (Journal Score: 0~3)
+#### B. 저널 가산점 (Journal Score: -1~+3)
 
-Impact Factor 기반 4단계 티어 시스템:
+Impact Factor 기반 5단계 티어 시스템:
 
 | 티어 | IF 범위 | 가산점 | 대표 저널 |
 |------|---------|--------|----------|
 | Tier 1 | IF ≥ 30 | +3 | NEJM, Lancet, JAMA, BMJ, Nat Med, Nat Rev Immunol, Ann Intern Med |
 | Tier 2 | IF 10-30 | +2 | Lancet/JAMA 계열, Nat Immunol, Blood, JACI, Allergy, BJD, JAAD, JCI |
-| Tier 3 | IF 5-10 | +1 | JACI Practice/Global, Clin Exp Allergy, Front Immunol 등 |
-| Tier 4 | IF < 5 | 0 | 기타 저널 |
+| Tier 3 | IF 4-10 | +1 | JACI Practice/Global, Clin Exp Allergy, Front Immunol 등 |
+| Tier 4 | IF 2-4 | 0 | 기타 저널 (Curr Opin Allergy, J Immunol 등) |
+| Tier 5 | IF ≤ ~2 | -1 | Asia Pac Allergy, Int Arch Allergy, Acta Derm Venereol |
 
 #### C. 출판 유형 (Publication Score: -5~+2)
 
@@ -136,6 +135,7 @@ Included 논문에 대해 GPT-5-mini로 한국어 요약을 생성합니다.
 - Slate Navy 디자인 테마
 - 논문별 카드 형식 (넘버링 포함)
 - PubMed 링크 포함
+- 푸터에 My Allergy 연구 포털(my-allergy.vercel.app) 소개 배너 포함
 - 주 수신자 + BCC 수신자 발송
 
 ### 설정
