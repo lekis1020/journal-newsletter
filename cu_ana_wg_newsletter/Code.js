@@ -298,7 +298,7 @@ function scoreJournalRelevance(journalName) {
   if (j.includes("nature immunology") || j.includes("nat immunol")) return 2;
   if (j.includes("nejm evidence") || j.includes("nejm evid")) return 2;
   if (j === "blood") return 2;
-  if (j === "haematologica") return 2;
+  if (j.includes("clinical reviews in allergy") || j.includes("clin rev allerg")) return 2;
   if (j.includes("journal of clinical investigation") || j.includes("j clin invest")) return 2;
   if ((j.includes("journal of allergy and clinical immunology") || j === "j allergy clin immunol")
       && !j.includes("practice") && !j.includes("global")) return 2;
@@ -306,27 +306,40 @@ function scoreJournalRelevance(journalName) {
   if (j.includes("british journal of dermatology") || j.includes("br j dermatol")) return 2;
   if (j.includes("american academy of dermatology") || j.includes("j am acad dermatol")) return 2;
 
-  // --- Tier 3 (IF 5-10, Score +1): Good specialty ---
-  if (j.includes("j allergy clin immunol")) return 1;
-  if (j.includes("journal of allergy and clinical immunology")) return 1;
+  // --- Tier 3 (IF 4-10, Score +1): Good specialty ---
+  // JACI: In Practice / JACI Global도 임상적 관련성 고려하여 +1 유지
+  if (j.includes("j allergy clin immunol") || j.includes("journal of allergy and clinical immunology")) return 1;
+  if (j === "haematologica") return 1;
   if (j.includes("clinical and experimental allergy") || j.includes("clin exp allergy")) return 1;
   if (j.includes("annals of allergy") || j.includes("ann allergy")) return 1;
-  if (j.includes("clinical reviews in allergy") || j.includes("clin rev allerg")) return 1;
   if (j.includes("investigative dermatology") || j.includes("j invest dermatol")) return 1;
   if (j.includes("european academy of dermatology") || j.includes("j eur acad dermatol")) return 1;
   if (j.includes("immunological reviews")) return 1;
   if (j.includes("frontiers in immunology")) return 1;
-  if (j.includes("world allergy organization")) return 1;
+  if (j.includes("world allergy organization") || j.includes("world allergy organ j")) return 1;
   if (j.includes("allergology international") || j.includes("allergol int")) return 1;
   if (j.includes("allergy, asthma and immunology research") || j.includes("allergy asthma immunol res")) return 1;
   if (j.includes("clinical and translational allergy") || j.includes("clin transl allergy")) return 1;
   if (j.includes("clinical and translational immunology")) return 1;
-  if (j.includes("clinical immunology") || j === "clin immunol") return 1;
+  // Clinical Immunology (IF 5.7) — startsWith로 한정해 "current opinion in ... clinical immunology"(IF 2.6) 오매칭 방지
+  if (j === "clin immunol" || j.startsWith("clinical immunology")) return 1;
   if (j.includes("pediatric allergy") || j.includes("pediatr allergy")) return 1;
   if (j.includes("contact dermatitis")) return 1;
   if (j.includes("investigational allergology") || j.includes("j investig allergol")) return 1;
+  if (j.includes("journal of dermatological science") || j.includes("j dermatol sci")) return 1;  // IF 4.0
 
-  // Tier 4 (IF < 5, Score 0)
+  // --- Tier 5 (IF ≤ ~2, Score -1): 매우 낮은 IF 저널 페널티 ---
+  if (j.includes("asia pacific allergy") || j.includes("asia pac allergy")) return -1;
+  if (j.includes("international archives of allergy") || j.includes("int arch allergy")) return -1;
+  if (j.includes("acta dermato-venereologica") || j.includes("acta derm venereol")) return -1;
+
+  // --- Tier 4 (IF 2-4, Score 0): config.js JOURNALS 중 명시적 0점 처리 저널 ---
+  // 아래 저널들은 검색 대상이나 IF가 낮아 점수 가산 없음 (참고용 명시):
+  // - Allergy Asthma Clin Immunol, Allergy Asthma Proc, Allergy Asthma Respir Dis
+  // - Curr Opin Allergy Clin Immunol (IF 2.6)
+  // - Immunol Lett, Complement
+  // - Mol Immunol (IF 3.0), J Immunol (IF 3.4), Eur J Immunol (IF 3.7)
+  // - Dermatology, Exp Dermatol (IF 3.2), Int J Dermatol (IF 3.3)
   return 0;
 }
 
