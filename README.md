@@ -134,7 +134,8 @@ Included 논문에 대해 GPT-5-mini로 한국어 요약을 생성합니다.
 
 - Slate Navy 디자인 테마
 - 논문별 카드 형식 (넘버링 포함)
-- PubMed 링크 포함
+- 논문별 링크: PubMed + My Allergy 포털 논문 딥링크(`my-allergy.vercel.app/paper/{PMID}`)
+  - 저널 가드: 논문 저널이 포털 등록 저널일 때만 My Allergy 링크 표시 (미등록 저널 논문의 404 방지)
 - 푸터에 My Allergy 연구 포털(my-allergy.vercel.app) 소개 배너 포함
 - 주 수신자 + BCC 수신자 발송
 
