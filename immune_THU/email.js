@@ -1,5 +1,98 @@
 
 /**
+ * My Allergy 연구 포털(my-allergy.vercel.app)이 추적하는 저널 목록.
+ * 포털은 등록된 저널의 논문만 동기화하므로, 목록 밖 저널 논문에 딥링크를 걸면
+ * /paper/{PMID} 페이지가 404가 된다. name + ISO abbreviation 두 형태를 모두 둔다.
+ */
+const MY_ALLERGY_PORTAL_JOURNALS = [
+  "Allergy",
+  "Clinical Reviews in Allergy & Immunology", "Clin Rev Allergy Immunol",
+  "Journal of Allergy and Clinical Immunology", "J Allergy Clin Immunol",
+  "Allergology International", "Allergol Int",
+  "Journal of Allergy and Clinical Immunology: In Practice", "J Allergy Clin Immunol Pract",
+  "Clinical and Experimental Allergy", "Clin Exp Allergy",
+  "Journal of Investigational Allergology and Clinical Immunology", "J Investig Allergol Clin Immunol",
+  "Annals of Allergy Asthma & Immunology", "Ann Allergy Asthma Immunol",
+  "Current Allergy and Asthma Reports", "Curr Allergy Asthma Rep",
+  "Contact Dermatitis",
+  "Pediatric Allergy and Immunology", "Pediatr Allergy Immunol",
+  "World Allergy Organization Journal", "World Allergy Organ J",
+  "Allergy Asthma & Immunology Research", "Allergy Asthma Immunol Res",
+  "Clinical and Translational Allergy", "Clin Transl Allergy",
+  "Journal of Asthma and Allergy", "J Asthma Allergy",
+  "Current Opinion in Allergy and Clinical Immunology", "Curr Opin Allergy Clin Immunol",
+  "Allergy Asthma and Clinical Immunology", "Allergy Asthma Clin Immunol",
+  "Allergy and Asthma Proceedings", "Allergy Asthma Proc",
+  "Immunology and Allergy Clinics of North America", "Immunol Allergy Clin North Am",
+  "Allergologia et Immunopathologia", "Allergol Immunopathol (Madr)",
+  "Asian Pacific Journal of Allergy and Immunology", "Asian Pac J Allergy Immunol",
+  "International Archives of Allergy and Immunology", "Int Arch Allergy Immunol",
+  "JACI: Global", "J Allergy Clin Immunol Glob",
+  "International Forum of Allergy & Rhinology", "Int Forum Allergy Rhinol",
+  "Frontiers in Immunology", "Front Immunol",
+  "Expert Review of Clinical Immunology", "Expert Rev Clin Immunol",
+  "Frontiers in Allergy", "Front Allergy",
+  "The Lancet", "Lancet",
+  "New England Journal of Medicine", "N Engl J Med",
+  "JAMA",
+  "BMJ",
+  "The Lancet Respiratory Medicine", "Lancet Respir Med",
+  "European Respiratory Journal", "Eur Respir J",
+  "American Journal of Respiratory and Critical Care Medicine", "Am J Respir Crit Care Med",
+  "Chest",
+  "Thorax"
+];
+
+/**
+ * 저널명을 비교용으로 정규화한다.
+ * 소문자화 → 괄호 한정어 제거(예: "(London, England)") → & → and →
+ * 영숫자 외 제거 → 선행 "the" 제거.
+ * @param {string} name
+ * @return {string}
+ */
+function normalizeJournalName(name) {
+  return String(name || "")
+    .toLowerCase()
+    .replace(/\s+:\s.*$/, " ")
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/^the\s+/, "")
+    .replace(/\s+/g, "");
+}
+
+const MY_ALLERGY_PORTAL_JOURNAL_SET = new Set(
+  MY_ALLERGY_PORTAL_JOURNALS.map(normalizeJournalName)
+);
+
+/**
+ * 해당 저널이 My Allergy 포털에 등록되어 있는지 여부.
+ * @param {string} journalName
+ * @return {boolean}
+ */
+function isInMyAllergyPortal(journalName) {
+  const normalized = normalizeJournalName(journalName);
+  if (!normalized) return false;
+  return MY_ALLERGY_PORTAL_JOURNAL_SET.has(normalized);
+}
+
+/**
+ * My Allergy 포털의 논문 딥링크를 만든다.
+ * 유효한 숫자 PMID이면서 저널이 포털에 등록된 경우에만 URL을 반환하고,
+ * 그 외에는 null을 반환한다(404 방지).
+ * @param {string|number} pmid
+ * @param {string} journalName
+ * @return {string|null}
+ */
+function buildMyAllergyLink(pmid, journalName) {
+  const cleanPmid = String(pmid || "").trim();
+  if (!/^\d+$/.test(cleanPmid)) return null;
+  if (!isInMyAllergyPortal(journalName)) return null;
+  return `https://my-allergy.vercel.app/paper/${cleanPmid}`;
+}
+
+/**
  * 논문 요약 결과를 이메일로 전송하는 함수
  * @param {SpreadsheetApp.Spreadsheet} spreadsheet - 논문 데이터가 있는 스프레드시트
  * @return {string} 처리 결과
@@ -145,7 +238,12 @@ function sendSummariesToEmail(spreadsheet) {
       
       // 링크 및 구분선
       emailBody += `<div style="margin-top: 10px; font-size: 14px;">`;
-      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank">${pubmedLink}</a><br>`;
+      const myAllergyLink = buildMyAllergyLink(pmid, journal);
+      emailBody += `<strong>링크:</strong> <a href="${pubmedLink}" target="_blank">PubMed</a>`;
+      if (myAllergyLink) {
+        emailBody += ` &nbsp;|&nbsp; <a href="${myAllergyLink}" target="_blank">My Allergy에서 보기</a>`;
+      }
+      emailBody += `<br>`;
       emailBody += `────────────────────────────── `;
       emailBody += `</div>`;
       emailBody += `</div>`;
